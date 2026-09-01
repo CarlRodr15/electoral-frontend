@@ -32,7 +32,8 @@ function SeleccionarUbicacion({ formData, setFormData }) {
 }
 
 function App() {
-  const [usuario, setUsuario] = useState(null)
+  // 🔥 AQUÍ ESTÁ LA MAGIA: Al abrir la app, busca si ya hay un usuario guardado
+  const [usuario, setUsuario] = useState(() => JSON.parse(localStorage.getItem('usuarioElectoral')) || null)
   const [pinAdmin, setPinAdmin] = useState('------')
   const [segundosRestantes, setSegundosRestantes] = useState(60 - new Date().getSeconds())
   const [loginData, setLoginData] = useState({ cedula: '', contrasena: '' })
@@ -138,7 +139,6 @@ function App() {
     window.addEventListener('online', manejarConexion);
     window.addEventListener('offline', manejarDesconexion);
     
-    // SOLUCIÓN ESLINT: Mover la ejecución al final de la cola de tareas
     const timerSync = setTimeout(() => {
       if (navigator.onLine && usuario) sincronizarPendientes();
     }, 0);
@@ -151,7 +151,6 @@ function App() {
   }, [usuario, sincronizarPendientes, mostrarAlerta])
 
   useEffect(() => {
-    // SOLUCIÓN ESLINT: Evitar actualizar el estado síncronamente durante el render
     const timerDatos = setTimeout(() => {
       cargarDatosIniciales();
     }, 0);
@@ -195,6 +194,8 @@ function App() {
     try {
       const respuesta = await axios.post('https://api-electoral-calima.onrender.com/api/login', loginData)
       setUsuario(respuesta.data.usuario)
+      // 🔥 AQUÍ ESTÁ LA MAGIA: Guardamos al usuario en la memoria del celular
+      localStorage.setItem('usuarioElectoral', JSON.stringify(respuesta.data.usuario))
       mostrarAlerta(`¡Bienvenido, ${respuesta.data.usuario.nombre}!`, 'exito')
     } catch (error) { 
       console.error(error);
@@ -296,7 +297,12 @@ function App() {
   }
 
   const cerrarSesion = () => {
-    setUsuario(null); setSimpatizantes([]); setUsuariosDb([]); setTerminoBusqueda('');
+    setUsuario(null); 
+    setSimpatizantes([]); 
+    setUsuariosDb([]); 
+    setTerminoBusqueda('');
+    // 🔥 AQUÍ ESTÁ LA MAGIA: Borramos la sesión al salir
+    localStorage.removeItem('usuarioElectoral');
   }
 
   const simpatizantesPermitidos = simpatizantes.filter(s => {
