@@ -86,10 +86,10 @@ function App() {
   const cargarDatosIniciales = useCallback(async () => {
     if (!navigator.onLine || !usuario) return; 
     try {
-      const resSimp = await axios.get('https://api-electoral-calima.onrender.com](https://api-electoral-calima.onrender.com/api/simpatizantes');
+      const resSimp = await axios.get('https://api-electoral-calima.onrender.com/api/simpatizantes');
       setSimpatizantes(resSimp.data);
       if (usuario.rol === 'ADMIN' || usuario.rol === 'CONCEJAL') {
-        const resUsu = await axios.get('https://api-electoral-calima.onrender.com](https://api-electoral-calima.onrender.com/api/usuarios');
+        const resUsu = await axios.get('https://api-electoral-calima.onrender.com/api/usuarios');
         setUsuariosDb(resUsu.data);
       }
     } catch (error) { console.error(error); }
@@ -104,7 +104,7 @@ function App() {
 
     for (const registro of pendientes) {
       try {
-        await axios.post('https://api-electoral-calima.onrender.com](https://api-electoral-calima.onrender.com/api/simpatizantes', registro);
+        await axios.post('https://api-electoral-calima.onrender.com/api/simpatizantes', registro);
         restantes = restantes.filter(r => r.cedula !== registro.cedula);
         sincronizados++;
       } catch (error) {
@@ -169,7 +169,7 @@ function App() {
       const cargarPin = async () => {
         if (!navigator.onLine) return;
         try {
-          const res = await axios.get('https://api-electoral-calima.onrender.com](https://api-electoral-calima.onrender.com/api/pin-seguridad');
+          const res = await axios.get('https://api-electoral-calima.onrender.com/api/pin-seguridad');
           setPinAdmin(res.data.pin);
         } catch (error) { console.error(error); }
       };
@@ -193,7 +193,7 @@ function App() {
     e.preventDefault()
     if (!navigator.onLine) return mostrarAlerta("Necesitas internet para iniciar sesión por primera vez.", "error");
     try {
-      const respuesta = await axios.post('https://api-electoral-calima.onrender.com](https://api-electoral-calima.onrender.com/api/login', loginData)
+      const respuesta = await axios.post('https://api-electoral-calima.onrender.com/api/login', loginData)
       setUsuario(respuesta.data.usuario)
       mostrarAlerta(`¡Bienvenido, ${respuesta.data.usuario.nombre}!`, 'exito')
     } catch (error) { 
@@ -220,7 +220,7 @@ function App() {
     }
 
     try {
-      await axios.post('https://api-electoral-calima.onrender.com](https://api-electoral-calima.onrender.com/api/simpatizantes', nuevoRegistro)
+      await axios.post('https://api-electoral-calima.onrender.com/api/simpatizantes', nuevoRegistro)
       mostrarAlerta("¡Simpatizante guardado con éxito!", 'exito')
       cargarDatosIniciales();
       setFormData({ nombreCompleto: '', cedula: '', telefono: '', zona: 'URBANA', barrioVereda: '', direccion: '', latitud: null, longitud: null, apoyaAlcaldia: false, apoyaConcejo: false })
@@ -239,7 +239,7 @@ function App() {
     e.preventDefault();
     if (!isOnline) return mostrarAlerta("Necesitas internet para crear usuarios.", "error");
     try {
-      await axios.post('https://api-electoral-calima.onrender.com](https://api-electoral-calima.onrender.com/api/usuarios', { ...nuevoUsuarioData, codigoAutorizacion: pinAdmin });
+      await axios.post('https://api-electoral-calima.onrender.com/api/usuarios', { ...nuevoUsuarioData, codigoAutorizacion: pinAdmin });
       mostrarAlerta(`¡${nuevoUsuarioData.rol} creado con éxito!`, 'exito');
       cargarDatosIniciales();
       setModalUsuarioAbierto(false);
@@ -253,7 +253,7 @@ function App() {
   const confirmarEliminarSimpatizante = async () => {
     if (!isOnline) return mostrarAlerta("Necesitas internet para eliminar registros.", "error");
     try {
-      await axios.delete(`https://api-electoral-calima.onrender.com](https://api-electoral-calima.onrender.com/api/simpatizantes/${modalConfirmacion.datos.id}`);
+      await axios.delete(`https://api-electoral-calima.onrender.com/api/simpatizantes/${modalConfirmacion.datos.id}`);
       cargarDatosIniciales();
       mostrarAlerta("Registro eliminado.", 'exito');
       setFiltroMapaInteractivo({ tipo: 'TODOS', id: null, nombre: '' }); 
@@ -267,7 +267,7 @@ function App() {
   const confirmarEliminarLider = async (accion) => {
     if (!isOnline) return mostrarAlerta("Necesitas internet para despedir usuarios.", "error");
     try {
-      await axios.delete(`https://api-electoral-calima.onrender.com](https://api-electoral-calima.onrender.com/api/usuarios/${modalConfirmacion.datos.id}`, { data: { accion: accion, adminId: usuario.id } });
+      await axios.delete(`https://api-electoral-calima.onrender.com/api/usuarios/${modalConfirmacion.datos.id}`, { data: { accion: accion, adminId: usuario.id } });
       cargarDatosIniciales();
       mostrarAlerta("El usuario fue eliminado exitosamente.", 'exito');
       setFiltroMapaInteractivo({ tipo: 'TODOS', id: null, nombre: '' });
@@ -283,7 +283,7 @@ function App() {
     if (!isOnline) return mostrarAlerta("Necesitas internet para transferir registros.", "error");
     if (!liderDestino) return mostrarAlerta("Debes seleccionar un líder o administrador de destino.", "error");
     try {
-      await axios.put(`https://api-electoral-calima.onrender.com](https://api-electoral-calima.onrender.com/api/simpatizantes/${modalTransferir.datos.id}/transferir`, { nuevoLiderId: liderDestino });
+      await axios.put(`https://api-electoral-calima.onrender.com/api/simpatizantes/${modalTransferir.datos.id}/transferir`, { nuevoLiderId: liderDestino });
       cargarDatosIniciales();
       mostrarAlerta("Simpatizante reasignado con éxito.", "exito");
       setModalTransferir({ visible: false, datos: null });
