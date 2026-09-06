@@ -11,17 +11,22 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'] 
       },
       manifest: {
+        id: '/',               // 👈 Identificador único moderno
+        start_url: '/',        // 👈 Punto de arranque
+        scope: '/',            // 👈 Alcance de la app
         name: 'Electora Panel',
         short_name: 'Electora',
         description: 'Plataforma de gestión territorial',
         theme_color: '#153c5e',
         background_color: '#f4f7f6',
         display: 'standalone',
+        orientation: 'portrait', // 👈 Bloquea la app en vertical (opcional pero recomendado)
         icons: [
           {
-            src: '/ELECTORA-iso.png', // 👈 Tu logo oficial
+            src: '/ELECTORA-iso.png',
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any'
           },
           {
             src: '/ELECTORA-iso.png',
