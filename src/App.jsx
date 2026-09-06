@@ -73,7 +73,6 @@ function BotonCentrarUbicacion({ setFormData }) {
         setFormData(prev => ({ ...prev, latitud: e.latlng.lat, longitud: e.latlng.lng }));
       }
     },
-    // 🔥 SOLUCIÓN ESLINT: Quitamos la 'e' de la función locationerror
     locationerror() {
       alert("No pudimos obtener tu ubicación. Verifica que el GPS esté encendido y le hayas dado permisos al navegador.");
     }
@@ -663,7 +662,7 @@ function App() {
 
       <div style={{ width: '100%', maxWidth: '1200px' }}>
         
-        {/* HEADER LIMPIO */}
+        {/* HEADER EXTRA LIMPIO (SIN BOTÓN DE AGREGAR EQUIPO AQUÍ) */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--bg-card)', padding: '15px 25px', borderRadius: '16px', flexWrap: 'wrap', gap: '15px', marginTop: '20px', boxShadow: 'var(--shadow)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
             <img src="/ELECTORA-iso.png" alt="Electora" style={{ width: '45px', height: 'auto' }} />
@@ -679,12 +678,6 @@ function App() {
             <button onClick={alternarTema} style={{ padding: '8px', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '50%', cursor: 'pointer', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px' }}>
               {modoOscuro ? '☀️' : '🌙'}
             </button>
-
-            {usuario.rol === 'ADMIN' && (
-              <button onClick={() => setModalUsuarioAbierto(true)} style={{ padding: '10px 20px', background: 'var(--secondary)', color: '#ffffff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                ➕ Equipo
-              </button>
-            )}
             <button onClick={cerrarSesion} style={{ padding: '10px 20px', background: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Salir</button>
           </div>
         </div>
@@ -1012,12 +1005,28 @@ function App() {
           )}
         </div>
 
-        {/* BOTÓN FLOTANTE REGISTRO SIMPATIZANTE */}
-        <button onClick={() => setModalAbierto(true)} style={{ position: 'fixed', bottom: '30px', right: '30px', background: 'var(--accent)', color: 'white', width: '65px', height: '65px', borderRadius: '50%', border: 'none', boxShadow: '0 10px 25px rgba(242, 139, 48, 0.4)', fontSize: '30px', cursor: 'pointer', zIndex: 100 }}>+</button>
+        {/* 🔥 BOTÓN FLOTANTE DINÁMICO */}
+        {usuario.rol === 'ADMIN' ? (
+          <button 
+            onClick={() => setModalUsuarioAbierto(true)} 
+            style={{ position: 'fixed', bottom: '30px', right: '30px', background: 'var(--primary)', color: 'white', width: '65px', height: '65px', borderRadius: '50%', border: 'none', boxShadow: '0 10px 25px rgba(21, 60, 94, 0.4)', fontSize: '24px', cursor: 'pointer', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            title="Agregar Equipo"
+          >
+            👤+
+          </button>
+        ) : (
+          <button 
+            onClick={() => setModalAbierto(true)} 
+            style={{ position: 'fixed', bottom: '30px', right: '30px', background: 'var(--accent)', color: 'white', width: '65px', height: '65px', borderRadius: '50%', border: 'none', boxShadow: '0 10px 25px rgba(242, 139, 48, 0.4)', fontSize: '30px', cursor: 'pointer', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            title="Agregar Simpatizante"
+          >
+            +
+          </button>
+        )}
 
       </div>
 
-      {/* 📝 EL FORMULARIO FLOTANTE (CREAR SIMPATIZANTES) */}
+      {/* 📝 EL FORMULARIO FLOTANTE (CREAR SIMPATIZANTES) SOLO PARA LIDERES/CONCEJALES */}
       {modalAbierto && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
           <div style={{ background: 'var(--bg-card)', padding: '30px', borderRadius: '20px', width: '100%', maxWidth: '450px', maxHeight: '90vh', overflowY: 'auto', boxShadow: 'var(--shadow)', position: 'relative' }}>
@@ -1056,7 +1065,6 @@ function App() {
               <div style={{ position: 'relative', height: '180px', width: '100%', borderRadius: '10px', overflow: 'hidden', border: formData.latitud ? '2px solid var(--secondary)' : '2px solid var(--border-color)', zIndex: 0 }}>
                 <MapContainer center={centroCalima} zoom={15} style={{ height: '100%', width: '100%', zIndex: 1 }}>
                   <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                  {/* 🔥 BOTÓN GPS EN EL FORMULARIO DE REGISTRO */}
                   <BotonCentrarUbicacion setFormData={setFormData} />
                   <SeleccionarUbicacion formData={formData} setFormData={setFormData} />
                 </MapContainer>
