@@ -47,12 +47,8 @@ const GlobalStyles = () => (
     @keyframes slideIn { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .grafica-barra { transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
     
-    /* 🔥 EL ESCUDO ANTI-ZOOM: Forzamos 16px en todos los inputs */
-    input, select, textarea { 
-      font-size: 16px !important; 
-      outline: none; 
-    }
-    input:focus, select:focus { border-color: var(--secondary) !important; box-shadow: 0 0 0 2px rgba(54, 156, 132, 0.2); }
+    input, select, textarea { font-size: 16px !important; outline: none; }
+    input:focus, select:focus, textarea:focus { border-color: var(--secondary) !important; box-shadow: 0 0 0 2px rgba(54, 156, 132, 0.2); }
   `}</style>
 )
 
@@ -67,7 +63,6 @@ function SeleccionarUbicacion({ formData, setFormData }) {
 }
 
 function App() {
-  // --- 1. ESTADOS PRINCIPALES ---
   const [usuario, setUsuario] = useState(() => JSON.parse(localStorage.getItem('usuarioElectoral')) || null)
   const [loginData, setLoginData] = useState({ cedula: '', contrasena: '' })
   const [modoOscuro, setModoOscuro] = useState(() => localStorage.getItem('temaElectoral') === 'dark')
@@ -75,11 +70,17 @@ function App() {
   const [simpatizantes, setSimpatizantes] = useState([])
   const [usuariosDb, setUsuariosDb] = useState([]) 
   const [historialConflictos, setHistorialConflictos] = useState([]) 
-  const [formData, setFormData] = useState({ nombreCompleto: '', cedula: '', telefono: '', zona: 'URBANA', barrioVereda: '', direccion: '', latitud: null, longitud: null, apoyaAlcaldia: false, apoyaConcejo: false })
+  
+  // 🔥 AÑADIDOS LOS CAMPOS NUEVOS
+  const [formData, setFormData] = useState({ nombreCompleto: '', cedula: '', telefono: '', zona: 'URBANA', barrioVereda: '', direccion: '', latitud: null, longitud: null, apoyaAlcaldia: false, apoyaConcejo: false, mesa: '', observaciones: '' })
 
   const [modalAbierto, setModalAbierto] = useState(false)
   const [modalUsuarioAbierto, setModalUsuarioAbierto] = useState(false)
   const [nuevoUsuarioData, setNuevoUsuarioData] = useState({ nombre: '', cedula: '', telefono: '', rol: 'CONCEJAL', contrasena: '', concejalId: '' })
+
+  // 🔥 ESTADOS PARA EL MODAL DE EDICIÓN
+  const [modalEditarAbierto, setModalEditarAbierto] = useState(false)
+  const [datosEdicion, setDatosEdicion] = useState({ id: null, mesa: '', observaciones: '' })
 
   const [vistaAdmin, setVistaAdmin] = useState('simpatizantes') 
   const [terminoBusqueda, setTerminoBusqueda] = useState('')
@@ -99,7 +100,6 @@ function App() {
 
   const centroCalima = [3.9274, -76.4851]
 
-  // --- 2. FUNCIONES BASE (Ordenadas para evitar errores de Linting) ---
   useEffect(() => {
     if (modoOscuro) {
       document.documentElement.setAttribute('data-theme', 'dark');
@@ -169,7 +169,6 @@ function App() {
     }
   }, [agregarConflicto, cargarDatosIniciales, mostrarAlerta]);
 
-  // --- 3. EFECTOS (Ciclo de vida) ---
   useEffect(() => {
     const manejarConexion = () => {
       setIsOnline(true);
@@ -206,7 +205,6 @@ function App() {
     };
   }, [cargarDatosIniciales])
 
-  // --- 4. ACCIONES DEL USUARIO ---
   const manejarLogin = async (e) => {
     e.preventDefault()
     if (!navigator.onLine) return mostrarAlerta("Necesitas internet para iniciar sesión por primera vez.", "error");
@@ -233,7 +231,7 @@ function App() {
       localStorage.setItem('colaOfflineElectoral', JSON.stringify(nuevaCola));
       setSimpatizantes([...simpatizantes, { ...nuevoRegistro, id: Date.now() }]); 
       mostrarAlerta("Sin internet 📡. Ficha guardada en memoria local.", 'exito');
-      setFormData({ nombreCompleto: '', cedula: '', telefono: '', zona: 'URBANA', barrioVereda: '', direccion: '', latitud: null, longitud: null, apoyaAlcaldia: false, apoyaConcejo: false })
+      setFormData({ nombreCompleto: '', cedula: '', telefono: '', zona: 'URBANA', barrioVereda: '', direccion: '', latitud: null, longitud: null, apoyaAlcaldia: false, apoyaConcejo: false, mesa: '', observaciones: '' })
       setModalAbierto(false)
       return;
     }
@@ -242,7 +240,7 @@ function App() {
       await axios.post('https://api-electoral-calima.onrender.com/api/simpatizantes', nuevoRegistro)
       mostrarAlerta("¡Simpatizante guardado con éxito!", 'exito')
       cargarDatosIniciales();
-      setFormData({ nombreCompleto: '', cedula: '', telefono: '', zona: 'URBANA', barrioVereda: '', direccion: '', latitud: null, longitud: null, apoyaAlcaldia: false, apoyaConcejo: false })
+      setFormData({ nombreCompleto: '', cedula: '', telefono: '', zona: 'URBANA', barrioVereda: '', direccion: '', latitud: null, longitud: null, apoyaAlcaldia: false, apoyaConcejo: false, mesa: '', observaciones: '' })
       setModalAbierto(false) 
     } catch (error) { 
       if (error.response?.status === 400) {
@@ -251,6 +249,21 @@ function App() {
       } else {
         mostrarAlerta("Error de conexión al guardar.", 'error'); 
       }
+    }
+  }
+
+  // 🔥 NUEVA FUNCIÓN PARA GUARDAR LA EDICIÓN DE MESA Y OBSERVACIONES
+  const guardarEdicion = async (e) => {
+    e.preventDefault();
+    if (!isOnline) return mostrarAlerta("Necesitas internet para editar registros.", "error");
+    try {
+      await axios.put(`https://api-electoral-calima.onrender.com/api/simpatizantes/${datosEdicion.id}`, { mesa: datosEdicion.mesa, observaciones: datosEdicion.observaciones });
+      mostrarAlerta("Registro actualizado correctamente", "exito");
+      cargarDatosIniciales();
+      setModalEditarAbierto(false);
+    } catch (error) {
+      console.error(error);
+      mostrarAlerta("Error al actualizar", "error");
     }
   }
 
@@ -333,7 +346,7 @@ function App() {
     localStorage.removeItem('usuarioElectoral');
   }
 
-  // --- 5. LÓGICA DE FILTRADO ---
+  // --- LÓGICA DE FILTRADO ---
   const simpatizantesPermitidos = simpatizantes.filter(s => {
     if (usuario?.rol === 'ADMIN') return true; 
     if (usuario?.rol === 'CONCEJAL') return s.liderId === usuario.id || s.lider?.concejalId === usuario.id; 
@@ -343,6 +356,34 @@ function App() {
   const simpatizantesVisibles = simpatizantesPermitidos.filter(s => 
     s.nombreCompleto.toLowerCase().includes(terminoBusqueda.toLowerCase()) || s.cedula.includes(terminoBusqueda)
   );
+
+  // 🔥 NUEVA FUNCIÓN PARA EXPORTAR A EXCEL (CSV)
+  const exportarAExcel = () => {
+    const cabeceras = ['Nombre Completo', 'Cédula', 'Teléfono', 'Zona', 'Barrio/Vereda', 'Dirección', 'Apoya Alcaldía', 'Apoya Concejo', 'Líder Registrador', 'Mesa Votación', 'Observaciones'];
+    
+    const filas = simpatizantesVisibles.map(s => [
+      `"${s.nombreCompleto}"`,
+      `"${s.cedula}"`,
+      `"${s.telefono || ''}"`,
+      `"${s.zona}"`,
+      `"${s.barrioVereda}"`,
+      `"${s.direccion}"`,
+      s.apoyaAlcaldia ? 'SI' : 'NO',
+      s.apoyaConcejo ? 'SI' : 'NO',
+      `"${s.lider?.nombre || 'Offline/Desconocido'}"`,
+      `"${s.mesa || ''}"`,
+      `"${s.observaciones ? s.observaciones.replace(/\n/g, ' ') : ''}"`
+    ]);
+
+    // \uFEFF fuerza a Excel a reconocer los acentos (UTF-8) y usamos ";" que es el estándar de Excel en Colombia
+    const contenidoCSV = "data:text/csv;charset=utf-8,\uFEFF" + cabeceras.join(";") + "\n" + filas.map(e => e.join(";")).join("\n");
+    const link = document.createElement("a");
+    link.setAttribute("href", encodeURI(contenidoCSV));
+    link.setAttribute("download", `Base_Datos_Electora_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const lideresPermitidos = usuariosDb.filter(u => {
     if (usuario?.rol === 'ADMIN') return u.rol === 'LIDER' || u.rol === 'CONCEJAL';
@@ -381,7 +422,6 @@ function App() {
   const votosAlcaldia = simpatizantesMetricas.filter(s => s.apoyaAlcaldia).length;
   const votosConcejo = simpatizantesMetricas.filter(s => s.apoyaConcejo).length;
 
-  // --- 6. RENDERIZADO VISUAL ---
   if (!usuario) {
     return (
       <div style={{ minHeight: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
@@ -477,7 +517,7 @@ function App() {
         </div>
       )}
 
-      {/* MODAL CREAR USUARIO RESTAURADO */}
+      {/* MODAL CREAR USUARIO */}
       {modalUsuarioAbierto && usuario.rol === 'ADMIN' && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
           <div style={{ background: 'var(--bg-card)', padding: '30px', borderRadius: '20px', width: '100%', maxWidth: '400px', boxShadow: 'var(--shadow)', position: 'relative' }}>
@@ -505,6 +545,34 @@ function App() {
               <input type="password" placeholder="Asignar Contraseña" required value={nuevoUsuarioData.contrasena} onChange={e => setNuevoUsuarioData({...nuevoUsuarioData, contrasena: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
               
               <button type="submit" style={{ padding: '16px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>Guardar Usuario</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🔥 NUEVO MODAL: EDITAR SIMPATIZANTE (Mesa y Observaciones) */}
+      {modalEditarAbierto && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
+          <div style={{ background: 'var(--bg-card)', padding: '30px', borderRadius: '20px', width: '100%', maxWidth: '400px', boxShadow: 'var(--shadow)', position: 'relative' }}>
+            <button onClick={() => setModalEditarAbierto(false)} style={{ position: 'absolute', top: '20px', right: '20px', background: 'var(--bg-main)', border: 'none', borderRadius: '50%', width: '35px', height: '35px', cursor: 'pointer', color: 'var(--text-muted)' }}>✕</button>
+            <h3 style={{ margin: '0 0 20px 0', color: 'var(--text-main)', fontSize: '22px' }}>✏️ Completar Datos</h3>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '20px', fontSize: '14px' }}>Actualiza la mesa o agrega notas para esta persona.</p>
+            
+            <form onSubmit={guardarEdicion} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <input 
+                placeholder="Número de Mesa (Ej: Mesa 4)" 
+                value={datosEdicion.mesa} 
+                onChange={e => setDatosEdicion({...datosEdicion, mesa: e.target.value})} 
+                style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} 
+              />
+              <textarea 
+                placeholder="Observaciones adicionales (transporte, estado de salud, etc.)" 
+                rows="4"
+                value={datosEdicion.observaciones} 
+                onChange={e => setDatosEdicion({...datosEdicion, observaciones: e.target.value})} 
+                style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)', resize: 'none' }} 
+              />
+              <button type="submit" style={{ padding: '16px', background: 'var(--secondary)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>Guardar Cambios</button>
             </form>
           </div>
         </div>
@@ -726,7 +794,7 @@ function App() {
           </div>
         </div>
 
-        {/* PESTAÑAS Y BUSCADOR */}
+        {/* PESTAÑAS Y BUSCADOR (AHORA CON BOTÓN DE EXCEL) */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '25px', flexWrap: 'wrap', gap: '15px' }}>
           <div style={{ display: 'flex', gap: '10px' }}>
             <button onClick={() => setVistaAdmin('simpatizantes')} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold', background: vistaAdmin === 'simpatizantes' ? 'var(--primary)' : 'var(--bg-card)', color: vistaAdmin === 'simpatizantes' ? 'white' : 'var(--text-muted)' }}>👥 Base de Datos</button>
@@ -736,7 +804,17 @@ function App() {
               </button>
             )}
           </div>
-          <input type="text" placeholder="🔍 Buscar..." value={terminoBusqueda} onChange={(e) => setTerminoBusqueda(e.target.value)} style={{ padding: '12px 20px', borderRadius: '30px', border: '1px solid var(--border-color)', width: '100%', maxWidth: '350px', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)' }} />
+          
+          <div style={{ display: 'flex', gap: '10px', width: '100%', maxWidth: '500px' }}>
+            <input type="text" placeholder="🔍 Buscar..." value={terminoBusqueda} onChange={(e) => setTerminoBusqueda(e.target.value)} style={{ padding: '12px 20px', borderRadius: '30px', border: '1px solid var(--border-color)', flex: 1, backgroundColor: 'var(--bg-card)', color: 'var(--text-main)' }} />
+            
+            {/* 🔥 BOTÓN DESCARGAR EXCEL */}
+            {vistaAdmin === 'simpatizantes' && (
+              <button onClick={exportarAExcel} style={{ padding: '12px 20px', borderRadius: '30px', border: 'none', background: 'var(--secondary)', color: 'white', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                ⬇️ Excel
+              </button>
+            )}
+          </div>
         </div>
 
         {/* LISTAS DE DATOS */}
@@ -745,10 +823,19 @@ function App() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {simpatizantesVisibles.length === 0 ? <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px 0' }}>No se encontraron simpatizantes.</p> : null}
               {simpatizantesVisibles.map(simp => (
-                <div key={simp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px', border: '1px solid var(--border-color)', borderRadius: '12px', flexWrap: 'wrap', gap: '10px', background: 'var(--bg-main)' }}>
-                  <div>
+                <div key={simp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '15px', border: '1px solid var(--border-color)', borderRadius: '12px', flexWrap: 'wrap', gap: '10px', background: 'var(--bg-main)' }}>
+                  <div style={{ flex: 1 }}>
                     <strong style={{ fontSize: '16px', color: 'var(--text-main)' }}>{simp.nombreCompleto}</strong>
                     <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '4px' }}>CC: {simp.cedula} &nbsp;•&nbsp; {simp.zona}: {simp.barrioVereda}</div>
+                    
+                    {/* INFO EXTRA: Mesa y Observaciones */}
+                    {(simp.mesa || simp.observaciones) && (
+                      <div style={{ marginTop: '8px', padding: '8px', background: 'var(--bg-card)', borderRadius: '6px', borderLeft: '3px solid var(--accent)' }}>
+                        {simp.mesa && <div style={{ fontSize: '12px', color: 'var(--text-main)' }}><strong>🗳️ Mesa:</strong> {simp.mesa}</div>}
+                        {simp.observaciones && <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '4px' }}>"{simp.observaciones}"</div>}
+                      </div>
+                    )}
+
                     {usuario.rol !== 'LIDER' && simp.lider && (
                       <div style={{ color: 'var(--primary)', fontSize: '12px', marginTop: '6px', fontWeight: 'bold' }}>👤 Registrado por: {simp.lider.nombre}</div>
                     )}
@@ -757,8 +844,11 @@ function App() {
                     {simp.apoyaAlcaldia && <span style={{ background: 'var(--primary)', color: 'white', padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>Alcaldía</span>}
                     {simp.apoyaConcejo && <span style={{ background: 'var(--secondary)', color: 'white', padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>Concejo</span>}
                     
+                    {/* 🔥 BOTÓN EDITAR */}
+                    <button onClick={() => { setDatosEdicion({ id: simp.id, mesa: simp.mesa || '', observaciones: simp.observaciones || '' }); setModalEditarAbierto(true); }} style={{ background: 'transparent', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontWeight: 'bold', marginLeft: '10px' }}>✏️</button>
+
                     {usuario.rol === 'ADMIN' && (
-                      <button onClick={() => setModalTransferir({ visible: true, datos: { id: simp.id, nombre: simp.nombreCompleto } })} style={{ background: 'transparent', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontWeight: 'bold', marginLeft: '10px' }}>Transferir</button>
+                      <button onClick={() => setModalTransferir({ visible: true, datos: { id: simp.id, nombre: simp.nombreCompleto } })} style={{ background: 'transparent', color: 'var(--primary)', border: '1px solid var(--primary)', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontWeight: 'bold', marginLeft: '5px' }}>Transferir</button>
                     )}
                     {(usuario.rol === 'ADMIN' || usuario.id === simp.liderId) && (
                       <button onClick={() => setModalConfirmacion({ visible: true, tipo: 'eliminar_simpatizante', datos: { id: simp.id, nombre: simp.nombreCompleto } })} style={{ background: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontWeight: 'bold', marginLeft: '5px' }}>X</button>
@@ -889,7 +979,7 @@ function App() {
 
       </div>
 
-      {/* 📝 EL FORMULARIO FLOTANTE (SIMPATIZANTES) */}
+      {/* 📝 EL FORMULARIO FLOTANTE (CREAR SIMPATIZANTES) */}
       {modalAbierto && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
           <div style={{ background: 'var(--bg-card)', padding: '30px', borderRadius: '20px', width: '100%', maxWidth: '450px', maxHeight: '90vh', overflowY: 'auto', boxShadow: 'var(--shadow)', position: 'relative' }}>
@@ -901,6 +991,10 @@ function App() {
               <input placeholder="Cédula" value={formData.cedula} onChange={e => setFormData({...formData, cedula: e.target.value})} required style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
               <input placeholder="Teléfono" value={formData.telefono} onChange={e => setFormData({...formData, telefono: e.target.value})} style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
               
+              {/* CAMPOS OPCIONALES NUEVOS */}
+              <input placeholder="Mesa de Votación (Opcional)" value={formData.mesa} onChange={e => setFormData({...formData, mesa: e.target.value})} style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
+              <textarea placeholder="Observaciones (transporte, etc.) (Opcional)" rows="2" value={formData.observaciones} onChange={e => setFormData({...formData, observaciones: e.target.value})} style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)', resize: 'none' }} />
+
               <div style={{ display: 'flex', gap: '10px' }}>
                 <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px', borderRadius: '8px', cursor: 'pointer', background: formData.zona === 'URBANA' ? 'var(--primary)' : 'var(--bg-input)', color: formData.zona === 'URBANA' ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', fontWeight: 'bold' }}>
                   <input type="radio" name="zona" value="URBANA" checked={formData.zona === 'URBANA'} onChange={() => setFormData({...formData, zona: 'URBANA', barrioVereda: ''})} style={{ display: 'none' }} />
