@@ -11,13 +11,45 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
+// 🔥 VARIABLES CSS: Aquí está inyectada la paleta de tu Logo y el Modo Oscuro
 const GlobalStyles = () => (
   <style>{`
-    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
-    body, html { margin: 0; padding: 0; background-color: #f1f5f9; color: #0f172a; width: 100vw; min-height: 100vh; overflow-x: hidden; }
+    :root {
+      --bg-main: #f4f7f6;
+      --bg-card: #ffffff;
+      --bg-input: #ffffff;
+      --text-main: #112a46;
+      --text-muted: #64748b;
+      --border-color: #cbd5e1;
+      --primary: #153c5e; /* Azul de tu Logo */
+      --secondary: #369c84; /* Verde Teal de tu Logo */
+      --accent: #f28b30; /* Naranja de tu Logo */
+      --danger: #ef4444;
+      --shadow: 0 4px 15px rgba(0,0,0,0.05);
+    }
+    
+    [data-theme='dark'] {
+      --bg-main: #0b1727;
+      --bg-card: #15273b;
+      --bg-input: #1e3650;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-color: #2c4a6b;
+      --primary: #2a6b9a;
+      --secondary: #42c19f;
+      --accent: #fb9c4a;
+      --danger: #ef4444;
+      --shadow: 0 4px 15px rgba(0,0,0,0.4);
+    }
+
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; transition: background-color 0.3s, color 0.3s; }
+    body, html { margin: 0; padding: 0; background-color: var(--bg-main); color: var(--text-main); width: 100vw; min-height: 100vh; overflow-x: hidden; }
     #root { width: 100%; max-width: none; padding: 0; margin: 0; }
     @keyframes slideIn { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .grafica-barra { transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
+    
+    input, select { outline: none; }
+    input:focus, select:focus { border-color: var(--secondary) !important; box-shadow: 0 0 0 2px rgba(54, 156, 132, 0.2); }
   `}</style>
 )
 
@@ -32,12 +64,16 @@ function SeleccionarUbicacion({ formData, setFormData }) {
 }
 
 function App() {
-  // 🔥 AQUÍ ESTÁ LA MAGIA: Al abrir la app, busca si ya hay un usuario guardado
   const [usuario, setUsuario] = useState(() => JSON.parse(localStorage.getItem('usuarioElectoral')) || null)
   const [pinAdmin, setPinAdmin] = useState('------')
   const [segundosRestantes, setSegundosRestantes] = useState(60 - new Date().getSeconds())
   const [loginData, setLoginData] = useState({ cedula: '', contrasena: '' })
   
+  // 🔥 ESTADO DEL MODO OSCURO
+  const [modoOscuro, setModoOscuro] = useState(() => {
+    return localStorage.getItem('temaElectoral') === 'dark';
+  })
+
   const [simpatizantes, setSimpatizantes] = useState([])
   const [usuariosDb, setUsuariosDb] = useState([]) 
   const [formData, setFormData] = useState({ nombreCompleto: '', cedula: '', telefono: '', zona: 'URBANA', barrioVereda: '', direccion: '', latitud: null, longitud: null, apoyaAlcaldia: false, apoyaConcejo: false })
@@ -65,6 +101,19 @@ function App() {
   const [modalHistorialAbierto, setModalHistorialAbierto] = useState(false)
 
   const centroCalima = [3.9274, -76.4851]
+
+  // EFECTO PARA CAMBIAR EL TEMA
+  useEffect(() => {
+    if (modoOscuro) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('temaElectoral', 'dark');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'light');
+      localStorage.setItem('temaElectoral', 'light');
+    }
+  }, [modoOscuro]);
+
+  const alternarTema = () => setModoOscuro(!modoOscuro);
 
   const mostrarAlerta = useCallback((mensaje, tipo = 'info') => {
     setNotificacion({ visible: true, mensaje, tipo });
@@ -194,7 +243,6 @@ function App() {
     try {
       const respuesta = await axios.post('https://api-electoral-calima.onrender.com/api/login', loginData)
       setUsuario(respuesta.data.usuario)
-      // 🔥 AQUÍ ESTÁ LA MAGIA: Guardamos al usuario en la memoria del celular
       localStorage.setItem('usuarioElectoral', JSON.stringify(respuesta.data.usuario))
       mostrarAlerta(`¡Bienvenido, ${respuesta.data.usuario.nombre}!`, 'exito')
     } catch (error) { 
@@ -301,7 +349,6 @@ function App() {
     setSimpatizantes([]); 
     setUsuariosDb([]); 
     setTerminoBusqueda('');
-    // 🔥 AQUÍ ESTÁ LA MAGIA: Borramos la sesión al salir
     localStorage.removeItem('usuarioElectoral');
   }
 
@@ -356,20 +403,28 @@ function App() {
     return (
       <div style={{ minHeight: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
         <GlobalStyles />
+        
+        {/* BOTÓN TEMA OSCURO FLOTANTE */}
+        <button onClick={alternarTema} style={{ position: 'fixed', top: '20px', right: '20px', background: 'var(--bg-card)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '50%', width: '45px', height: '45px', cursor: 'pointer', fontSize: '20px', boxShadow: 'var(--shadow)' }}>
+          {modoOscuro ? '☀️' : '🌙'}
+        </button>
+
         {notificacion.visible && (
-          <div style={{ position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)', background: notificacion.tipo === 'error' ? '#ef4444' : '#10b981', color: 'white', padding: '15px 30px', borderRadius: '30px', fontWeight: 'bold', zIndex: 9999, animation: 'slideIn 0.3s ease-out' }}>
+          <div style={{ position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)', background: notificacion.tipo === 'error' ? 'var(--danger)' : 'var(--secondary)', color: '#ffffff', padding: '15px 30px', borderRadius: '30px', fontWeight: 'bold', zIndex: 9999, animation: 'slideIn 0.3s ease-out' }}>
             {notificacion.mensaje}
           </div>
         )}
-        <div style={{ background: 'white', padding: '40px 30px', borderRadius: '20px', boxShadow: '0 10px 30px rgba(0,0,0,0.08)', width: '100%', maxWidth: '400px' }}>
+        <div style={{ background: 'var(--bg-card)', padding: '40px 30px', borderRadius: '20px', boxShadow: 'var(--shadow)', width: '100%', maxWidth: '400px' }}>
           <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-            <h1 style={{ color: '#0f172a', margin: '0 0 5px 0', fontSize: '26px' }}>Panel Electoral</h1>
-            <p style={{ color: '#64748b', margin: 0 }}>Calima El Darién</p>
+            {/* 🔥 EL LOGO INTEGRADO EN EL LOGIN */}
+            <img src="/ELECTORA-iso.png" alt="Electora Logo" style={{ width: '90px', marginBottom: '15px' }} />
+            <h1 style={{ color: 'var(--text-main)', margin: '0 0 5px 0', fontSize: '26px' }}>Electora</h1>
+            <p style={{ color: 'var(--text-muted)', margin: 0 }}>Calima El Darién</p>
           </div>
           <form onSubmit={manejarLogin} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <input placeholder="Número de Cédula" required onChange={e => setLoginData({...loginData, cedula: e.target.value})} style={{ padding: '14px', border: '1px solid #e2e8f0', borderRadius: '10px', backgroundColor: '#ffffff', color: '#000000' }} />
-            <input type="password" placeholder="Contraseña" required onChange={e => setLoginData({...loginData, contrasena: e.target.value})} style={{ padding: '14px', border: '1px solid #e2e8f0', borderRadius: '10px', backgroundColor: '#ffffff', color: '#000000' }} />
-            <button type="submit" style={{ padding: '16px', background: '#0f172a', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>Ingresar al Sistema</button>
+            <input placeholder="Número de Cédula" required onChange={e => setLoginData({...loginData, cedula: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
+            <input type="password" placeholder="Contraseña" required onChange={e => setLoginData({...loginData, contrasena: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
+            <button type="submit" style={{ padding: '16px', background: 'var(--primary)', color: '#ffffff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>Ingresar al Sistema</button>
           </form>
         </div>
       </div>
@@ -381,9 +436,9 @@ function App() {
       <GlobalStyles />
       
       {/* 📡 INDICADOR DE RED Y NOTIFICACIONES */}
-      <div style={{ position: 'fixed', top: '10px', right: '20px', display: 'flex', alignItems: 'center', gap: '8px', background: 'white', padding: '6px 12px', borderRadius: '20px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)', zIndex: 9999 }}>
-        <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: isOnline ? '#10b981' : '#ef4444', boxShadow: isOnline ? '0 0 8px #10b981' : '0 0 8px #ef4444' }}></div>
-        <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569', marginRight: '10px' }}>{isOnline ? 'Conectado' : 'Offline'}</span>
+      <div style={{ position: 'fixed', top: '10px', right: '20px', display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-card)', padding: '6px 12px', borderRadius: '20px', boxShadow: 'var(--shadow)', zIndex: 9999 }}>
+        <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: isOnline ? 'var(--secondary)' : 'var(--danger)', boxShadow: isOnline ? '0 0 8px var(--secondary)' : '0 0 8px var(--danger)' }}></div>
+        <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-muted)', marginRight: '10px' }}>{isOnline ? 'Conectado' : 'Offline'}</span>
         
         {/* 🔔 BOTÓN DE HISTORIAL DE CONFLICTOS */}
         <button 
@@ -392,17 +447,17 @@ function App() {
         >
           🔔
           {historialConflictos.length > 0 && (
-            <span style={{ position: 'absolute', top: '-5px', right: '-8px', background: '#ef4444', color: 'white', fontSize: '9px', fontWeight: 'bold', padding: '2px 5px', borderRadius: '10px' }}>
+            <span style={{ position: 'absolute', top: '-5px', right: '-8px', background: 'var(--danger)', color: 'white', fontSize: '9px', fontWeight: 'bold', padding: '2px 5px', borderRadius: '10px' }}>
               {historialConflictos.length}
             </span>
           )}
         </button>
         
-        {colaOffline.length > 0 && <span style={{ fontSize: '12px', background: '#fbbf24', color: '#92400e', padding: '2px 6px', borderRadius: '10px', fontWeight: 'bold', marginLeft: '10px' }}>{colaOffline.length} en cola</span>}
+        {colaOffline.length > 0 && <span style={{ fontSize: '12px', background: 'var(--accent)', color: '#ffffff', padding: '2px 6px', borderRadius: '10px', fontWeight: 'bold', marginLeft: '10px' }}>{colaOffline.length} en cola</span>}
       </div>
 
       {notificacion.visible && (
-        <div style={{ position: 'fixed', top: '50px', left: '50%', transform: 'translateX(-50%)', background: notificacion.tipo === 'error' ? '#ef4444' : (notificacion.tipo === 'exito' ? '#10b981' : '#3b82f6'), color: 'white', padding: '15px 30px', borderRadius: '30px', fontWeight: 'bold', zIndex: 9999, animation: 'slideIn 0.3s ease-out', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ position: 'fixed', top: '50px', left: '50%', transform: 'translateX(-50%)', background: notificacion.tipo === 'error' ? 'var(--danger)' : (notificacion.tipo === 'exito' ? 'var(--secondary)' : 'var(--primary)'), color: 'white', padding: '15px 30px', borderRadius: '30px', fontWeight: 'bold', zIndex: 9999, animation: 'slideIn 0.3s ease-out', display: 'flex', alignItems: 'center', gap: '10px' }}>
           {notificacion.mensaje}
         </div>
       )}
@@ -410,19 +465,19 @@ function App() {
       {/* 🛑 MODAL: HISTORIAL DE CONFLICTOS */}
       {modalHistorialAbierto && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
-          <div style={{ background: 'white', padding: '30px', borderRadius: '20px', width: '100%', maxWidth: '500px', maxHeight: '80vh', overflowY: 'auto', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', position: 'relative' }}>
-            <button onClick={() => setModalHistorialAbierto(false)} style={{ position: 'absolute', top: '20px', right: '20px', background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '35px', height: '35px', cursor: 'pointer', color: '#64748b' }}>✕</button>
-            <h3 style={{ margin: '0 0 5px 0', color: '#0f172a', fontSize: '22px' }}>🔔 Auditoría de Registros</h3>
-            <p style={{ color: '#64748b', marginBottom: '20px', fontSize: '14px' }}>Historial de cédulas duplicadas o rechazadas.</p>
+          <div style={{ background: 'var(--bg-card)', padding: '30px', borderRadius: '20px', width: '100%', maxWidth: '500px', maxHeight: '80vh', overflowY: 'auto', boxShadow: 'var(--shadow)', position: 'relative' }}>
+            <button onClick={() => setModalHistorialAbierto(false)} style={{ position: 'absolute', top: '20px', right: '20px', background: 'var(--bg-main)', border: 'none', borderRadius: '50%', width: '35px', height: '35px', cursor: 'pointer', color: 'var(--text-muted)' }}>✕</button>
+            <h3 style={{ margin: '0 0 5px 0', color: 'var(--text-main)', fontSize: '22px' }}>🔔 Auditoría de Registros</h3>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '20px', fontSize: '14px' }}>Historial de cédulas duplicadas o rechazadas.</p>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {historialConflictos.length === 0 ? (
-                <p style={{ textAlign: 'center', color: '#94a3b8', padding: '20px 0' }}>No hay alertas recientes.</p>
+                <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px 0' }}>No hay alertas recientes.</p>
               ) : (
                 historialConflictos.map(conflicto => (
-                  <div key={conflicto.id} style={{ padding: '15px', borderLeft: '4px solid #ef4444', background: '#fef2f2', borderRadius: '8px' }}>
-                    <strong style={{ fontSize: '15px', color: '#991b1b', display: 'block', marginBottom: '4px' }}>⚠️ {conflicto.motivo}</strong>
-                    <div style={{ fontSize: '13px', color: '#7f1d1d' }}>
+                  <div key={conflicto.id} style={{ padding: '15px', borderLeft: '4px solid var(--danger)', background: 'var(--bg-input)', borderRadius: '8px' }}>
+                    <strong style={{ fontSize: '15px', color: 'var(--danger)', display: 'block', marginBottom: '4px' }}>⚠️ {conflicto.motivo}</strong>
+                    <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
                       <strong>Cédula:</strong> {conflicto.cedula} <br/>
                       <strong>Nombre:</strong> {conflicto.nombre} <br/>
                       <strong>Hora del intento:</strong> {conflicto.fecha}
@@ -433,7 +488,7 @@ function App() {
             </div>
 
             {historialConflictos.length > 0 && (
-              <button onClick={limpiarHistorial} style={{ width: '100%', padding: '12px', marginTop: '20px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>
+              <button onClick={limpiarHistorial} style={{ width: '100%', padding: '12px', marginTop: '20px', background: 'var(--bg-main)', color: 'var(--text-main)', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>
                 Limpiar Historial
               </button>
             )}
@@ -441,118 +496,49 @@ function App() {
         </div>
       )}
 
-      {/* MODAL CREAR EQUIPO */}
-      {modalUsuarioAbierto && usuario.rol === 'ADMIN' && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
-          <div style={{ background: 'white', padding: '30px', borderRadius: '20px', width: '100%', maxWidth: '400px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', position: 'relative' }}>
-            <button onClick={() => setModalUsuarioAbierto(false)} style={{ position: 'absolute', top: '20px', right: '20px', background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '35px', height: '35px', cursor: 'pointer', color: '#64748b' }}>✕</button>
-            <h3 style={{ margin: '0 0 20px 0', color: '#0f172a', fontSize: '22px' }}>➕ Nuevo Miembro</h3>
-            
-            <form onSubmit={crearUsuarioDesdeAdmin} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              <select value={nuevoUsuarioData.rol} onChange={e => setNuevoUsuarioData({...nuevoUsuarioData, rol: e.target.value, concejalId: ''})} required style={{ padding: '14px', borderRadius: '10px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#0f172a', fontWeight: 'bold' }}>
-                <option value="CONCEJAL">Candidato al Concejo</option>
-                <option value="LIDER">Líder de Campaña</option>
-              </select>
-
-              {nuevoUsuarioData.rol === 'LIDER' && (
-                <select value={nuevoUsuarioData.concejalId} onChange={e => setNuevoUsuarioData({...nuevoUsuarioData, concejalId: e.target.value})} required style={{ padding: '14px', borderRadius: '10px', border: '2px solid #8b5cf6', backgroundColor: '#f5f3ff', color: '#0f172a' }}>
-                  <option value="" disabled>Selecciona a qué Concejal pertenece...</option>
-                  {usuariosDb.filter(u => u.rol === 'CONCEJAL').map(c => (
-                    <option key={c.id} value={c.id}>Concejal: {c.nombre}</option>
-                  ))}
-                </select>
-              )}
-
-              <input placeholder="Nombre Completo" required value={nuevoUsuarioData.nombre} onChange={e => setNuevoUsuarioData({...nuevoUsuarioData, nombre: e.target.value})} style={{ padding: '14px', border: '1px solid #cbd5e1', borderRadius: '10px', backgroundColor: '#ffffff', color: '#000000' }} />
-              <input placeholder="Cédula" required value={nuevoUsuarioData.cedula} onChange={e => setNuevoUsuarioData({...nuevoUsuarioData, cedula: e.target.value})} style={{ padding: '14px', border: '1px solid #cbd5e1', borderRadius: '10px', backgroundColor: '#ffffff', color: '#000000' }} />
-              <input placeholder="Teléfono" required value={nuevoUsuarioData.telefono} onChange={e => setNuevoUsuarioData({...nuevoUsuarioData, telefono: e.target.value})} style={{ padding: '14px', border: '1px solid #cbd5e1', borderRadius: '10px', backgroundColor: '#ffffff', color: '#000000' }} />
-              <input type="password" placeholder="Asignar Contraseña" required value={nuevoUsuarioData.contrasena} onChange={e => setNuevoUsuarioData({...nuevoUsuarioData, contrasena: e.target.value})} style={{ padding: '14px', border: '1px solid #cbd5e1', borderRadius: '10px', backgroundColor: '#ffffff', color: '#000000' }} />
-              
-              <button type="submit" style={{ padding: '16px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>Guardar Usuario</button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODALES DE TRANSFERENCIA Y CONFIRMACIÓN */}
-      {modalTransferir.visible && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
-          <div style={{ background: 'white', padding: '30px', borderRadius: '20px', width: '100%', maxWidth: '400px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
-            <h3 style={{ margin: '0 0 15px 0', color: '#0f172a', fontSize: '22px' }}>🔄 Reasignar Simpatizante</h3>
-            <p style={{ color: '#64748b', marginBottom: '20px', fontSize: '15px' }}>Elige el nuevo líder para <strong>{modalTransferir.datos.nombre}</strong>.</p>
-            <form onSubmit={ejecutarTransferencia} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              <select value={liderDestino} onChange={(e) => setLiderDestino(e.target.value)} required style={{ padding: '14px', borderRadius: '10px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#0f172a', outline: 'none' }}>
-                <option value="" disabled>Selecciona el nuevo destino...</option>
-                <option value={usuario.id}>Mi equipo (Admin)</option>
-                {lideresPermitidos.map(l => (
-                  <option key={l.id} value={l.id}>{l.nombre} ({l.rol})</option>
-                ))}
-              </select>
-              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                <button type="button" onClick={() => { setModalTransferir({visible: false, datos: null}); setLiderDestino(''); }} style={{ flex: 1, padding: '12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>Cancelar</button>
-                <button type="submit" style={{ flex: 1, padding: '12px', background: '#8b5cf6', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>Transferir</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {modalConfirmacion.visible && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
-          <div style={{ background: 'white', padding: '30px', borderRadius: '20px', width: '100%', maxWidth: '400px', textAlign: 'center' }}>
-            <h3 style={{ margin: '0 0 15px 0', color: '#0f172a', fontSize: '22px' }}>⚠️ Confirmar Acción</h3>
-            <p style={{ color: '#64748b', marginBottom: '25px', fontSize: '15px' }}>
-              Estás a punto de eliminar a <strong>{modalConfirmacion.datos.nombre}</strong>.
-            </p>
-            {modalConfirmacion.tipo === 'eliminar_simpatizante' && (
-              <div style={{ display: 'flex', gap: '15px' }}>
-                <button onClick={() => setModalConfirmacion({ visible: false, tipo: '', datos: null })} style={{ flex: 1, padding: '12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>Cancelar</button>
-                <button onClick={confirmarEliminarSimpatizante} style={{ flex: 1, padding: '12px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>Eliminar</button>
-              </div>
-            )}
-            {modalConfirmacion.tipo === 'eliminar_lider' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <button onClick={() => confirmarEliminarLider('transferir')} style={{ width: '100%', padding: '14px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>📦 Eliminar y TRANSFERIR registros</button>
-                <button onClick={() => confirmarEliminarLider('borrar_todo')} style={{ width: '100%', padding: '14px', background: '#fee2e2', color: '#ef4444', border: '2px solid #fca5a5', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>🗑️ Borrar TODO (Usuario y registros)</button>
-                <button onClick={() => setModalConfirmacion({ visible: false, tipo: '', datos: null })} style={{ width: '100%', padding: '12px', background: 'transparent', color: '#64748b', border: 'none', cursor: 'pointer', fontWeight: 'bold', marginTop: '10px' }}>Cancelar</button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       <div style={{ width: '100%', maxWidth: '1200px' }}>
         
-        {/* HEADER DE LA APP */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', padding: '15px 25px', borderRadius: '16px', flexWrap: 'wrap', gap: '15px', marginTop: '20px' }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: '20px' }}>Hola, {usuario.nombre.split(' ')[0]}</h2>
-            <span style={{ fontSize: '12px', fontWeight: 'bold', background: usuario.rol === 'ADMIN' ? '#dbeafe' : (usuario.rol === 'CONCEJAL' ? '#e0e7ff' : '#dcfce3'), color: usuario.rol === 'ADMIN' ? '#1e40af' : (usuario.rol === 'CONCEJAL' ? '#4338ca' : '#166534'), padding: '4px 10px', borderRadius: '12px', display: 'inline-block', marginTop: '5px' }}>
-              {usuario.rol}
-            </span>
+        {/* HEADER DE LA APP - AHORA CON LOGO Y BOTÓN DE TEMA */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--bg-card)', padding: '15px 25px', borderRadius: '16px', flexWrap: 'wrap', gap: '15px', marginTop: '20px', boxShadow: 'var(--shadow)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            {/* 🔥 EL LOGO EN EL HEADER */}
+            <img src="/ELECTORA-iso.png" alt="Electora" style={{ width: '45px', height: 'auto' }} />
+            <div>
+              <h2 style={{ margin: 0, fontSize: '20px', color: 'var(--text-main)' }}>Hola, {usuario.nombre.split(' ')[0]}</h2>
+              <span style={{ fontSize: '12px', fontWeight: 'bold', background: usuario.rol === 'ADMIN' ? 'var(--primary)' : (usuario.rol === 'CONCEJAL' ? 'var(--secondary)' : 'var(--accent)'), color: '#ffffff', padding: '4px 10px', borderRadius: '12px', display: 'inline-block', marginTop: '5px' }}>
+                {usuario.rol}
+              </span>
+            </div>
           </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
+            
+            {/* BOTÓN TEMA OSCURO */}
+            <button onClick={alternarTema} style={{ padding: '8px', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '50%', cursor: 'pointer', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px' }}>
+              {modoOscuro ? '☀️' : '🌙'}
+            </button>
+
             {usuario.rol === 'ADMIN' && (
               <>
-                <div style={{ background: '#0f172a', padding: '8px 20px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+                <div style={{ background: 'var(--bg-main)', padding: '8px 20px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '15px', border: '1px solid var(--border-color)' }}>
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontSize: '10px', color: '#94a3b8' }}>PIN DE ACCESO</span>
-                    <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#fbbf24' }}>{pinAdmin}</span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>PIN DE ACCESO</span>
+                    <span style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--accent)' }}>{pinAdmin}</span>
                   </div>
                   <div style={{ position: 'relative', width: '36px', height: '36px' }}>
                     <svg width="36" height="36" viewBox="0 0 36 36" style={{ transform: 'rotate(-90deg)' }}>
-                      <circle cx="18" cy="18" r="15" stroke="#334155" strokeWidth="4" fill="none" />
-                      <circle cx="18" cy="18" r="15" stroke="#3b82f6" strokeWidth="4" fill="none" strokeDasharray={94.2} strokeDashoffset={94.2 - (segundosRestantes / 60) * 94.2} style={{ transition: 'stroke-dashoffset 1s linear' }} />
+                      <circle cx="18" cy="18" r="15" stroke="var(--border-color)" strokeWidth="4" fill="none" />
+                      <circle cx="18" cy="18" r="15" stroke="var(--secondary)" strokeWidth="4" fill="none" strokeDasharray={94.2} strokeDashoffset={94.2 - (segundosRestantes / 60) * 94.2} style={{ transition: 'stroke-dashoffset 1s linear' }} />
                     </svg>
-                    <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '12px', fontWeight: 'bold' }}>{segundosRestantes}</div>
+                    <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-main)', fontSize: '12px', fontWeight: 'bold' }}>{segundosRestantes}</div>
                   </div>
                 </div>
-                <button onClick={() => setModalUsuarioAbierto(true)} style={{ padding: '10px 20px', background: '#3b82f6', color: '#ffffff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  ➕ Crear Equipo
+                <button onClick={() => setModalUsuarioAbierto(true)} style={{ padding: '10px 20px', background: 'var(--secondary)', color: '#ffffff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  ➕ Equipo
                 </button>
               </>
             )}
-            <button onClick={cerrarSesion} style={{ padding: '10px 20px', background: '#fee2e2', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Salir</button>
+            <button onClick={cerrarSesion} style={{ padding: '10px 20px', background: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Salir</button>
           </div>
         </div>
 
@@ -560,79 +546,79 @@ function App() {
         <div style={{ display: 'flex', gap: '15px', marginTop: '20px', flexWrap: 'wrap' }}>
           <div 
             onClick={() => { setFiltroZonaMapa('TODOS'); setFiltroLugarMapa('TODOS'); }}
-            style={{ flex: '1 1 200px', background: 'white', padding: '20px', borderRadius: '16px', borderLeft: '5px solid #0f172a', cursor: 'pointer', outline: filtroZonaMapa === 'TODOS' ? '3px solid #0f172a' : 'none', transform: filtroZonaMapa === 'TODOS' ? 'scale(1.03)' : 'scale(1)', transition: 'all 0.2s', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}
+            style={{ flex: '1 1 200px', background: 'var(--bg-card)', padding: '20px', borderRadius: '16px', borderLeft: '5px solid var(--primary)', cursor: 'pointer', outline: filtroZonaMapa === 'TODOS' ? '3px solid var(--primary)' : 'none', transform: filtroZonaMapa === 'TODOS' ? 'scale(1.03)' : 'scale(1)', transition: 'all 0.2s', boxShadow: 'var(--shadow)' }}
           >
-            <h3 style={{ margin: '0 0 5px 0', color: '#64748b', fontSize: '13px', textTransform: 'uppercase' }}>
+            <h3 style={{ margin: '0 0 5px 0', color: 'var(--text-muted)', fontSize: '13px', textTransform: 'uppercase' }}>
               {filtroMapaInteractivo.tipo === 'TODOS' ? 'TOTAL REGISTROS' : `EQUIPO: ${filtroMapaInteractivo.nombre}`}
             </h3>
-            <p style={{ fontSize: '32px', margin: 0, fontWeight: '800', color: '#0f172a' }}>{simpatizantesMetricas.length}</p>
+            <p style={{ fontSize: '32px', margin: 0, fontWeight: '800', color: 'var(--text-main)' }}>{simpatizantesMetricas.length}</p>
           </div>
           <div 
             onClick={() => { setFiltroZonaMapa('URBANA'); setFiltroLugarMapa('TODOS'); }}
-            style={{ flex: '1 1 200px', background: 'white', padding: '20px', borderRadius: '16px', borderLeft: '5px solid #3b82f6', cursor: 'pointer', outline: filtroZonaMapa === 'URBANA' ? '3px solid #3b82f6' : 'none', transform: filtroZonaMapa === 'URBANA' ? 'scale(1.03)' : 'scale(1)', transition: 'all 0.2s', boxShadow: '0 4px 15px rgba(59, 130, 246, 0.1)' }}
+            style={{ flex: '1 1 200px', background: 'var(--bg-card)', padding: '20px', borderRadius: '16px', borderLeft: '5px solid var(--secondary)', cursor: 'pointer', outline: filtroZonaMapa === 'URBANA' ? '3px solid var(--secondary)' : 'none', transform: filtroZonaMapa === 'URBANA' ? 'scale(1.03)' : 'scale(1)', transition: 'all 0.2s', boxShadow: 'var(--shadow)' }}
           >
-            <h3 style={{ margin: '0 0 5px 0', color: '#3b82f6', fontSize: '13px' }}>FUERZA URBANA</h3>
-            <p style={{ fontSize: '32px', margin: 0, fontWeight: '800', color: '#1e3a8a' }}>{simpatizantesMetricas.filter(s => s.zona === 'URBANA').length}</p>
+            <h3 style={{ margin: '0 0 5px 0', color: 'var(--secondary)', fontSize: '13px' }}>FUERZA URBANA</h3>
+            <p style={{ fontSize: '32px', margin: 0, fontWeight: '800', color: 'var(--text-main)' }}>{simpatizantesMetricas.filter(s => s.zona === 'URBANA').length}</p>
           </div>
           <div 
             onClick={() => { setFiltroZonaMapa('RURAL'); setFiltroLugarMapa('TODOS'); }}
-            style={{ flex: '1 1 200px', background: 'white', padding: '20px', borderRadius: '16px', borderLeft: '5px solid #10b981', cursor: 'pointer', outline: filtroZonaMapa === 'RURAL' ? '3px solid #10b981' : 'none', transform: filtroZonaMapa === 'RURAL' ? 'scale(1.03)' : 'scale(1)', transition: 'all 0.2s', boxShadow: '0 4px 15px rgba(16, 185, 129, 0.1)' }}
+            style={{ flex: '1 1 200px', background: 'var(--bg-card)', padding: '20px', borderRadius: '16px', borderLeft: '5px solid var(--accent)', cursor: 'pointer', outline: filtroZonaMapa === 'RURAL' ? '3px solid var(--accent)' : 'none', transform: filtroZonaMapa === 'RURAL' ? 'scale(1.03)' : 'scale(1)', transition: 'all 0.2s', boxShadow: 'var(--shadow)' }}
           >
-            <h3 style={{ margin: '0 0 5px 0', color: '#10b981', fontSize: '13px' }}>FUERZA RURAL</h3>
-            <p style={{ fontSize: '32px', margin: 0, fontWeight: '800', color: '#064e3b' }}>{simpatizantesMetricas.filter(s => s.zona === 'RURAL').length}</p>
+            <h3 style={{ margin: '0 0 5px 0', color: 'var(--accent)', fontSize: '13px' }}>FUERZA RURAL</h3>
+            <p style={{ fontSize: '32px', margin: 0, fontWeight: '800', color: 'var(--text-main)' }}>{simpatizantesMetricas.filter(s => s.zona === 'RURAL').length}</p>
           </div>
         </div>
 
         {/* 📈 DASHBOARD DE GRÁFICAS ESTADÍSTICAS NATIVAS */}
         <div style={{ display: 'flex', gap: '15px', marginTop: '20px', flexWrap: 'wrap' }}>
           
-          <div style={{ flex: '1 1 300px', background: 'white', padding: '20px', borderRadius: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
-            <h3 style={{ margin: '0 0 15px 0', color: '#0f172a', fontSize: '16px' }}>🏙️ Top Barrios (Urbano)</h3>
-            {topBarrios.length === 0 ? <p style={{color: '#94a3b8', fontSize: '14px'}}>Sin datos urbanos.</p> : null}
+          <div style={{ flex: '1 1 300px', background: 'var(--bg-card)', padding: '20px', borderRadius: '16px', boxShadow: 'var(--shadow)' }}>
+            <h3 style={{ margin: '0 0 15px 0', color: 'var(--text-main)', fontSize: '16px' }}>🏙️ Top Barrios (Urbano)</h3>
+            {topBarrios.length === 0 ? <p style={{color: 'var(--text-muted)', fontSize: '14px'}}>Sin datos urbanos.</p> : null}
             {topBarrios.map(([nombre, cantidad]) => (
               <div key={nombre} style={{ marginBottom: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 'bold', color: '#475569', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: '4px' }}>
                   <span>{nombre}</span><span>{cantidad}</span>
                 </div>
-                <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div className="grafica-barra" style={{ width: `${(cantidad / maxBarrio) * 100}%`, height: '100%', background: '#3b82f6', borderRadius: '4px' }} />
+                <div style={{ height: '8px', background: 'var(--bg-main)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div className="grafica-barra" style={{ width: `${(cantidad / maxBarrio) * 100}%`, height: '100%', background: 'var(--secondary)', borderRadius: '4px' }} />
                 </div>
               </div>
             ))}
           </div>
 
-          <div style={{ flex: '1 1 300px', background: 'white', padding: '20px', borderRadius: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
-            <h3 style={{ margin: '0 0 15px 0', color: '#0f172a', fontSize: '16px' }}>🌲 Top Veredas (Rural)</h3>
-            {topVeredas.length === 0 ? <p style={{color: '#94a3b8', fontSize: '14px'}}>Sin datos rurales.</p> : null}
+          <div style={{ flex: '1 1 300px', background: 'var(--bg-card)', padding: '20px', borderRadius: '16px', boxShadow: 'var(--shadow)' }}>
+            <h3 style={{ margin: '0 0 15px 0', color: 'var(--text-main)', fontSize: '16px' }}>🌲 Top Veredas (Rural)</h3>
+            {topVeredas.length === 0 ? <p style={{color: 'var(--text-muted)', fontSize: '14px'}}>Sin datos rurales.</p> : null}
             {topVeredas.map(([nombre, cantidad]) => (
               <div key={nombre} style={{ marginBottom: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 'bold', color: '#475569', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 'bold', color: 'var(--text-muted)', marginBottom: '4px' }}>
                   <span>{nombre}</span><span>{cantidad}</span>
                 </div>
-                <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div className="grafica-barra" style={{ width: `${(cantidad / maxVereda) * 100}%`, height: '100%', background: '#10b981', borderRadius: '4px' }} />
+                <div style={{ height: '8px', background: 'var(--bg-main)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div className="grafica-barra" style={{ width: `${(cantidad / maxVereda) * 100}%`, height: '100%', background: 'var(--accent)', borderRadius: '4px' }} />
                 </div>
               </div>
             ))}
           </div>
 
-          <div style={{ flex: '1 1 300px', background: 'white', padding: '20px', borderRadius: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
-            <h3 style={{ margin: '0 0 15px 0', color: '#0f172a', fontSize: '16px' }}>📊 Intención de Voto</h3>
+          <div style={{ flex: '1 1 300px', background: 'var(--bg-card)', padding: '20px', borderRadius: '16px', boxShadow: 'var(--shadow)' }}>
+            <h3 style={{ margin: '0 0 15px 0', color: 'var(--text-main)', fontSize: '16px' }}>📊 Intención de Voto</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '20px' }}>
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 'bold', color: '#4338ca', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 'bold', color: 'var(--primary)', marginBottom: '4px' }}>
                   <span>🏛️ Apoyo Alcaldía</span><span>{votosAlcaldia}</span>
                 </div>
-                <div style={{ height: '12px', background: '#f1f5f9', borderRadius: '6px', overflow: 'hidden' }}>
-                  <div className="grafica-barra" style={{ width: `${simpatizantesMetricas.length ? (votosAlcaldia / simpatizantesMetricas.length) * 100 : 0}%`, height: '100%', background: '#6366f1', borderRadius: '6px' }} />
+                <div style={{ height: '12px', background: 'var(--bg-main)', borderRadius: '6px', overflow: 'hidden' }}>
+                  <div className="grafica-barra" style={{ width: `${simpatizantesMetricas.length ? (votosAlcaldia / simpatizantesMetricas.length) * 100 : 0}%`, height: '100%', background: 'var(--primary)', borderRadius: '6px' }} />
                 </div>
               </div>
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 'bold', color: '#15803d', marginBottom: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 'bold', color: 'var(--secondary)', marginBottom: '4px' }}>
                   <span>👥 Apoyo Concejo</span><span>{votosConcejo}</span>
                 </div>
-                <div style={{ height: '12px', background: '#f1f5f9', borderRadius: '6px', overflow: 'hidden' }}>
-                  <div className="grafica-barra" style={{ width: `${simpatizantesMetricas.length ? (votosConcejo / simpatizantesMetricas.length) * 100 : 0}%`, height: '100%', background: '#22c55e', borderRadius: '6px' }} />
+                <div style={{ height: '12px', background: 'var(--bg-main)', borderRadius: '6px', overflow: 'hidden' }}>
+                  <div className="grafica-barra" style={{ width: `${simpatizantesMetricas.length ? (votosConcejo / simpatizantesMetricas.length) * 100 : 0}%`, height: '100%', background: 'var(--secondary)', borderRadius: '6px' }} />
                 </div>
               </div>
             </div>
@@ -641,9 +627,9 @@ function App() {
         </div>
 
         {/* 🗺️ MAPA CON FILTRO ESPACIAL Y DE LUGARES EN LA ESQUINA */}
-        <div style={{ marginTop: '20px', background: 'white', padding: '20px', borderRadius: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
+        <div style={{ marginTop: '20px', background: 'var(--bg-card)', padding: '20px', borderRadius: '16px', boxShadow: 'var(--shadow)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
-            <h3 style={{ margin: '0 0 5px 0', color: '#0f172a' }}>📍 Análisis Territorial Espacial</h3>
+            <h3 style={{ margin: '0 0 5px 0', color: 'var(--text-main)' }}>📍 Análisis Territorial Espacial</h3>
             
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               <select 
@@ -654,7 +640,7 @@ function App() {
                   if (BARRIOS_URBANOS.includes(val)) setFiltroZonaMapa('URBANA');
                   if (VEREDAS_RURALES.includes(val)) setFiltroZonaMapa('RURAL');
                 }} 
-                style={{ padding: '8px 15px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#0f172a', outline: 'none', fontWeight: 'bold', cursor: 'pointer' }}
+                style={{ padding: '8px 15px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)', fontWeight: 'bold', cursor: 'pointer' }}
               >
                 <option value="TODOS">🗺️ Ver todos los lugares</option>
                 <optgroup label="🏙️ Zona Urbana">
@@ -673,7 +659,7 @@ function App() {
                     setFiltroLugarMapa('TODOS');
                     setEquipoExpandido(null);
                   }}
-                  style={{ padding: '8px 15px', borderRadius: '8px', border: 'none', background: '#fee2e2', color: '#ef4444', fontWeight: 'bold', cursor: 'pointer' }}
+                  style={{ padding: '8px 15px', borderRadius: '8px', border: '1px solid var(--danger)', background: 'transparent', color: 'var(--danger)', fontWeight: 'bold', cursor: 'pointer' }}
                 >
                   ✖ Quitar Filtros
                 </button>
@@ -681,14 +667,14 @@ function App() {
             </div>
           </div>
           
-          <div style={{ height: '400px', width: '100%', borderRadius: '12px', overflow: 'hidden', border: '1px solid #e2e8f0', zIndex: 0 }}>
+          <div style={{ height: '400px', width: '100%', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)', zIndex: 0 }}>
             <MapContainer center={centroCalima} zoom={14} style={{ height: '100%', width: '100%', zIndex: 1 }}>
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
               {simpatizantesMapa.map(s => (
                 <Marker key={s.id} position={[s.latitud, s.longitud]}>
                   <Popup>
-                    <strong>{s.nombreCompleto}</strong><br/>
-                    {s.zona} - {s.barrioVereda}<br/>
+                    <strong style={{color: '#000'}}>{s.nombreCompleto}</strong><br/>
+                    <span style={{color: '#333'}}>{s.zona} - {s.barrioVereda}</span><br/>
                     {usuario.rol !== 'LIDER' && s.lider && <span style={{ color: '#8b5cf6', fontSize: '11px' }}>Líder: {s.lider.nombre}</span>}
                   </Popup>
                 </Marker>
@@ -700,39 +686,39 @@ function App() {
         {/* PESTAÑAS Y BUSCADOR */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '25px', flexWrap: 'wrap', gap: '15px' }}>
           <div style={{ display: 'flex', gap: '10px' }}>
-            <button onClick={() => setVistaAdmin('simpatizantes')} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold', background: vistaAdmin === 'simpatizantes' ? '#0f172a' : '#e2e8f0', color: vistaAdmin === 'simpatizantes' ? 'white' : '#475569' }}>👥 Base de Datos</button>
+            <button onClick={() => setVistaAdmin('simpatizantes')} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold', background: vistaAdmin === 'simpatizantes' ? 'var(--primary)' : 'var(--bg-card)', color: vistaAdmin === 'simpatizantes' ? 'white' : 'var(--text-muted)' }}>👥 Base de Datos</button>
             {(usuario.rol === 'ADMIN' || usuario.rol === 'CONCEJAL') && (
-              <button onClick={() => setVistaAdmin('lideres')} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold', background: vistaAdmin === 'lideres' ? '#0f172a' : '#e2e8f0', color: vistaAdmin === 'lideres' ? 'white' : '#475569' }}>
+              <button onClick={() => setVistaAdmin('lideres')} style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold', background: vistaAdmin === 'lideres' ? 'var(--primary)' : 'var(--bg-card)', color: vistaAdmin === 'lideres' ? 'white' : 'var(--text-muted)' }}>
                 🏅 {usuario.rol === 'ADMIN' ? 'Equipo Político' : 'Mi Equipo'}
               </button>
             )}
           </div>
-          <input type="text" placeholder="🔍 Buscar..." value={terminoBusqueda} onChange={(e) => setTerminoBusqueda(e.target.value)} style={{ padding: '12px 20px', borderRadius: '30px', border: '1px solid #cbd5e1', width: '100%', maxWidth: '350px', backgroundColor: '#ffffff', color: '#000000', outline: 'none' }} />
+          <input type="text" placeholder="🔍 Buscar..." value={terminoBusqueda} onChange={(e) => setTerminoBusqueda(e.target.value)} style={{ padding: '12px 20px', borderRadius: '30px', border: '1px solid var(--border-color)', width: '100%', maxWidth: '350px', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)' }} />
         </div>
 
         {/* LISTAS DE DATOS */}
-        <div style={{ marginTop: '20px', background: 'white', padding: '20px', borderRadius: '16px' }}>
+        <div style={{ marginTop: '20px', background: 'var(--bg-card)', padding: '20px', borderRadius: '16px', boxShadow: 'var(--shadow)' }}>
           {vistaAdmin === 'simpatizantes' ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {simpatizantesVisibles.length === 0 ? <p style={{ textAlign: 'center', color: '#94a3b8', padding: '20px 0' }}>No se encontraron simpatizantes.</p> : null}
+              {simpatizantesVisibles.length === 0 ? <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px 0' }}>No se encontraron simpatizantes.</p> : null}
               {simpatizantesVisibles.map(simp => (
-                <div key={simp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px', border: '1px solid #f1f5f9', borderRadius: '12px', flexWrap: 'wrap', gap: '10px' }}>
+                <div key={simp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px', border: '1px solid var(--border-color)', borderRadius: '12px', flexWrap: 'wrap', gap: '10px', background: 'var(--bg-main)' }}>
                   <div>
-                    <strong style={{ fontSize: '16px' }}>{simp.nombreCompleto}</strong>
-                    <div style={{ color: '#64748b', fontSize: '13px', marginTop: '4px' }}>CC: {simp.cedula} &nbsp;•&nbsp; {simp.zona}: {simp.barrioVereda}</div>
+                    <strong style={{ fontSize: '16px', color: 'var(--text-main)' }}>{simp.nombreCompleto}</strong>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '4px' }}>CC: {simp.cedula} &nbsp;•&nbsp; {simp.zona}: {simp.barrioVereda}</div>
                     {usuario.rol !== 'LIDER' && simp.lider && (
-                      <div style={{ color: '#8b5cf6', fontSize: '12px', marginTop: '6px', fontWeight: 'bold' }}>👤 Registrado por: {simp.lider.nombre}</div>
+                      <div style={{ color: 'var(--primary)', fontSize: '12px', marginTop: '6px', fontWeight: 'bold' }}>👤 Registrado por: {simp.lider.nombre}</div>
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    {simp.apoyaAlcaldia && <span style={{ background: '#dbeafe', color: '#1e40af', padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>Alcaldía</span>}
-                    {simp.apoyaConcejo && <span style={{ background: '#dcfce3', color: '#166534', padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>Concejo</span>}
+                    {simp.apoyaAlcaldia && <span style={{ background: 'var(--primary)', color: 'white', padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>Alcaldía</span>}
+                    {simp.apoyaConcejo && <span style={{ background: 'var(--secondary)', color: 'white', padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>Concejo</span>}
                     
                     {usuario.rol === 'ADMIN' && (
-                      <button onClick={() => setModalTransferir({ visible: true, datos: { id: simp.id, nombre: simp.nombreCompleto } })} style={{ background: '#ede9fe', color: '#8b5cf6', border: 'none', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontWeight: 'bold', marginLeft: '10px' }}>Transferir</button>
+                      <button onClick={() => setModalTransferir({ visible: true, datos: { id: simp.id, nombre: simp.nombreCompleto } })} style={{ background: 'transparent', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontWeight: 'bold', marginLeft: '10px' }}>Transferir</button>
                     )}
                     {(usuario.rol === 'ADMIN' || usuario.id === simp.liderId) && (
-                      <button onClick={() => setModalConfirmacion({ visible: true, tipo: 'eliminar_simpatizante', datos: { id: simp.id, nombre: simp.nombreCompleto } })} style={{ background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontWeight: 'bold', marginLeft: '5px' }}>X</button>
+                      <button onClick={() => setModalConfirmacion({ visible: true, tipo: 'eliminar_simpatizante', datos: { id: simp.id, nombre: simp.nombreCompleto } })} style={{ background: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontWeight: 'bold', marginLeft: '5px' }}>X</button>
                     )}
                   </div>
                 </div>
@@ -743,7 +729,7 @@ function App() {
               
               {usuario.rol === 'CONCEJAL' && (
                 <>
-                  {lideresPermitidos.length === 0 ? <p style={{ textAlign: 'center', color: '#94a3b8', padding: '20px 0' }}>Aún no tienes líderes a tu cargo.</p> : null}
+                  {lideresPermitidos.length === 0 ? <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px 0' }}>Aún no tienes líderes a tu cargo.</p> : null}
                   {lideresPermitidos.map(lider => {
                     const registrosLider = simpatizantes.filter(s => s.liderId === lider.id).length;
                     const esLiderSeleccionado = filtroMapaInteractivo.tipo === 'LIDER' && filtroMapaInteractivo.id === lider.id;
@@ -751,15 +737,15 @@ function App() {
                       <div 
                         key={lider.id} 
                         onClick={() => setFiltroMapaInteractivo({ tipo: 'LIDER', id: lider.id, nombre: lider.nombre })}
-                        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px', border: esLiderSeleccionado ? '2px solid #10b981' : '1px solid #e2e8f0', background: '#f8fafc', borderRadius: '12px', cursor: 'pointer' }}
+                        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px', border: esLiderSeleccionado ? '2px solid var(--secondary)' : '1px solid var(--border-color)', background: 'var(--bg-main)', borderRadius: '12px', cursor: 'pointer' }}
                       >
                         <div>
-                          <strong style={{ fontSize: '16px' }}>{lider.nombre}</strong> <span style={{ fontSize: '10px', background: '#dcfce3', color: '#166534', padding: '2px 6px', borderRadius: '4px' }}>LÍDER</span>
-                          <div style={{ color: '#64748b', fontSize: '13px', marginTop: '4px' }}>CC: {lider.cedula} &nbsp;•&nbsp; Tel: {lider.telefono || 'N/A'}</div>
+                          <strong style={{ fontSize: '16px', color: 'var(--text-main)' }}>{lider.nombre}</strong> <span style={{ fontSize: '10px', background: 'var(--secondary)', color: 'white', padding: '2px 6px', borderRadius: '4px' }}>LÍDER</span>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '4px' }}>CC: {lider.cedula} &nbsp;•&nbsp; Tel: {lider.telefono || 'N/A'}</div>
                         </div>
                         <div style={{ textAlign: 'center' }}>
-                          <span style={{ fontSize: '12px', color: '#64748b', display: 'block' }}>Aportes</span>
-                          <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#0f172a' }}>{registrosLider}</span>
+                          <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Aportes</span>
+                          <span style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--text-main)' }}>{registrosLider}</span>
                         </div>
                       </div>
                     )
@@ -776,28 +762,28 @@ function App() {
                     const estaSeleccionadoMapa = filtroMapaInteractivo.tipo === 'CONCEJAL' && filtroMapaInteractivo.id === concejal.id;
 
                     return (
-                      <div key={concejal.id} style={{ display: 'flex', flexDirection: 'column', border: estaSeleccionadoMapa ? '2px solid #8b5cf6' : '1px solid #e2e8f0', background: '#f8fafc', borderRadius: '12px', overflow: 'hidden', transition: 'all 0.3s ease' }}>
+                      <div key={concejal.id} style={{ display: 'flex', flexDirection: 'column', border: estaSeleccionadoMapa ? '2px solid var(--primary)' : '1px solid var(--border-color)', background: 'var(--bg-main)', borderRadius: '12px', overflow: 'hidden', transition: 'all 0.3s ease' }}>
                         <div 
                           onClick={() => { setFiltroMapaInteractivo({ tipo: 'CONCEJAL', id: concejal.id, nombre: concejal.nombre }); setEquipoExpandido(estaExpandido ? null : concejal.id); }}
-                          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px', cursor: 'pointer', background: estaExpandido ? '#f1f5f9' : 'transparent' }}
+                          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px', cursor: 'pointer', background: estaExpandido ? 'var(--bg-card)' : 'transparent' }}
                         >
                           <div>
-                            <strong style={{ fontSize: '18px', color: '#0f172a' }}>{concejal.nombre}</strong> <span style={{ fontSize: '10px', background: '#e0e7ff', color: '#4338ca', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold', marginLeft: '5px' }}>CONCEJAL</span>
-                            <div style={{ color: '#64748b', fontSize: '13px', marginTop: '4px' }}>CC: {concejal.cedula} &nbsp;•&nbsp; Líderes a cargo: {lideresDeEsteConcejal.length}</div>
+                            <strong style={{ fontSize: '18px', color: 'var(--text-main)' }}>{concejal.nombre}</strong> <span style={{ fontSize: '10px', background: 'var(--primary)', color: 'white', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold', marginLeft: '5px' }}>CONCEJAL</span>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '4px' }}>CC: {concejal.cedula} &nbsp;•&nbsp; Líderes a cargo: {lideresDeEsteConcejal.length}</div>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                             <div style={{ textAlign: 'center' }}>
-                              <span style={{ fontSize: '12px', color: '#64748b', display: 'block' }}>Total Equipo</span>
-                              <span style={{ fontSize: '22px', fontWeight: 'bold', color: '#4338ca' }}>{registrosDelEquipo}</span>
+                              <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Total Equipo</span>
+                              <span style={{ fontSize: '22px', fontWeight: 'bold', color: 'var(--primary)' }}>{registrosDelEquipo}</span>
                             </div>
-                            <button onClick={(e) => { e.stopPropagation(); setModalConfirmacion({ visible: true, tipo: 'eliminar_lider', datos: { id: concejal.id, nombre: concejal.nombre } }); }} style={{ background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '8px', padding: '10px 15px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold' }}>Despedir</button>
-                            <span style={{ transform: estaExpandido ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s' }}>▼</span>
+                            <button onClick={(e) => { e.stopPropagation(); setModalConfirmacion({ visible: true, tipo: 'eliminar_lider', datos: { id: concejal.id, nombre: concejal.nombre } }); }} style={{ background: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '8px', padding: '8px 12px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold' }}>Despedir</button>
+                            <span style={{ transform: estaExpandido ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s', color: 'var(--text-main)' }}>▼</span>
                           </div>
                         </div>
 
                         {estaExpandido && (
-                          <div style={{ background: 'white', padding: '15px', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            {lideresDeEsteConcejal.length === 0 ? <p style={{ textAlign: 'center', color: '#94a3b8', margin: '10px 0' }}>No tiene líderes registrados aún.</p> : null}
+                          <div style={{ background: 'var(--bg-card)', padding: '15px', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {lideresDeEsteConcejal.length === 0 ? <p style={{ textAlign: 'center', color: 'var(--text-muted)', margin: '10px 0' }}>No tiene líderes registrados aún.</p> : null}
                             {lideresDeEsteConcejal.map(lider => {
                               const registrosLider = simpatizantes.filter(s => s.liderId === lider.id).length;
                               const esLiderSeleccionado = filtroMapaInteractivo.tipo === 'LIDER' && filtroMapaInteractivo.id === lider.id;
@@ -805,17 +791,17 @@ function App() {
                                 <div 
                                   key={lider.id} 
                                   onClick={(e) => { e.stopPropagation(); setFiltroMapaInteractivo({ tipo: 'LIDER', id: lider.id, nombre: lider.nombre }); }}
-                                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 15px', borderLeft: esLiderSeleccionado ? '4px solid #10b981' : '4px solid #cbd5e1', background: '#f8fafc', borderRadius: '0 8px 8px 0', cursor: 'pointer' }}
+                                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 15px', borderLeft: esLiderSeleccionado ? '4px solid var(--secondary)' : '4px solid var(--border-color)', background: 'var(--bg-main)', borderRadius: '0 8px 8px 0', cursor: 'pointer' }}
                                 >
                                   <div>
-                                    <strong style={{ fontSize: '15px' }}>↳ {lider.nombre}</strong> <span style={{ fontSize: '10px', background: '#dcfce3', color: '#166534', padding: '2px 6px', borderRadius: '4px' }}>LÍDER</span>
+                                    <strong style={{ fontSize: '15px', color: 'var(--text-main)' }}>↳ {lider.nombre}</strong> <span style={{ fontSize: '10px', background: 'var(--secondary)', color: 'white', padding: '2px 6px', borderRadius: '4px' }}>LÍDER</span>
                                   </div>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                                     <div style={{ textAlign: 'right' }}>
-                                      <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>Aportes</span>
-                                      <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#0f172a' }}>{registrosLider}</span>
+                                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Aportes</span>
+                                      <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--text-main)' }}>{registrosLider}</span>
                                     </div>
-                                    <button onClick={(e) => { e.stopPropagation(); setModalConfirmacion({ visible: true, tipo: 'eliminar_lider', datos: { id: lider.id, nombre: lider.nombre } }); }} style={{ background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>X</button>
+                                    <button onClick={(e) => { e.stopPropagation(); setModalConfirmacion({ visible: true, tipo: 'eliminar_lider', datos: { id: lider.id, nombre: lider.nombre } }); }} style={{ background: 'transparent', color: 'var(--danger)', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold' }}>✕</button>
                                   </div>
                                 </div>
                               )
@@ -833,18 +819,18 @@ function App() {
                       <div 
                         key={lider.id} 
                         onClick={() => setFiltroMapaInteractivo({ tipo: 'LIDER', id: lider.id, nombre: lider.nombre })}
-                        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px', border: esLiderSeleccionado ? '2px solid #10b981' : '1px solid #e2e8f0', background: '#f8fafc', borderRadius: '12px', cursor: 'pointer' }}
+                        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px', border: esLiderSeleccionado ? '2px solid var(--secondary)' : '1px solid var(--border-color)', background: 'var(--bg-main)', borderRadius: '12px', cursor: 'pointer' }}
                       >
                         <div>
-                          <strong style={{ fontSize: '16px' }}>{lider.nombre}</strong> <span style={{ fontSize: '10px', background: '#dcfce3', color: '#166534', padding: '2px 6px', borderRadius: '4px' }}>LÍDER DIRECTO</span>
-                          <div style={{ color: '#64748b', fontSize: '13px', marginTop: '4px' }}>CC: {lider.cedula} &nbsp;•&nbsp; Tel: {lider.telefono || 'N/A'}</div>
+                          <strong style={{ fontSize: '16px', color: 'var(--text-main)' }}>{lider.nombre}</strong> <span style={{ fontSize: '10px', background: 'var(--secondary)', color: 'white', padding: '2px 6px', borderRadius: '4px' }}>LÍDER DIRECTO</span>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '4px' }}>CC: {lider.cedula} &nbsp;•&nbsp; Tel: {lider.telefono || 'N/A'}</div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                           <div style={{ textAlign: 'center' }}>
-                            <span style={{ fontSize: '12px', color: '#64748b', display: 'block' }}>Registros</span>
-                            <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#0f172a' }}>{registros}</span>
+                            <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Registros</span>
+                            <span style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--text-main)' }}>{registros}</span>
                           </div>
-                          <button onClick={(e) => { e.stopPropagation(); setModalConfirmacion({ visible: true, tipo: 'eliminar_lider', datos: { id: lider.id, nombre: lider.nombre } }); }} style={{ background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '8px', padding: '10px 15px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold' }}>Despedir</button>
+                          <button onClick={(e) => { e.stopPropagation(); setModalConfirmacion({ visible: true, tipo: 'eliminar_lider', datos: { id: lider.id, nombre: lider.nombre } }); }} style={{ background: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '8px', padding: '8px 12px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold' }}>Despedir</button>
                         </div>
                       </div>
                     )
@@ -856,43 +842,43 @@ function App() {
         </div>
 
         {/* BOTÓN FLOTANTE REGISTRO SIMPATIZANTE */}
-        <button onClick={() => setModalAbierto(true)} style={{ position: 'fixed', bottom: '30px', right: '30px', background: '#3b82f6', color: 'white', width: '65px', height: '65px', borderRadius: '50%', border: 'none', boxShadow: '0 10px 25px rgba(59, 130, 246, 0.5)', fontSize: '30px', cursor: 'pointer', zIndex: 100 }}>+</button>
+        <button onClick={() => setModalAbierto(true)} style={{ position: 'fixed', bottom: '30px', right: '30px', background: 'var(--accent)', color: 'white', width: '65px', height: '65px', borderRadius: '50%', border: 'none', boxShadow: '0 10px 25px rgba(242, 139, 48, 0.4)', fontSize: '30px', cursor: 'pointer', zIndex: 100 }}>+</button>
 
       </div>
 
       {/* 📝 EL FORMULARIO FLOTANTE (SIMPATIZANTES) */}
       {modalAbierto && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-          <div style={{ background: 'white', padding: '30px', borderRadius: '20px', width: '100%', maxWidth: '450px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', position: 'relative' }}>
-            <button onClick={() => setModalAbierto(false)} style={{ position: 'absolute', top: '20px', right: '20px', background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '35px', height: '35px', cursor: 'pointer', color: '#64748b' }}>✕</button>
-            <h3 style={{ margin: '0 0 20px 0', fontSize: '22px' }}>Ficha de Simpatizante</h3>
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+          <div style={{ background: 'var(--bg-card)', padding: '30px', borderRadius: '20px', width: '100%', maxWidth: '450px', maxHeight: '90vh', overflowY: 'auto', boxShadow: 'var(--shadow)', position: 'relative' }}>
+            <button onClick={() => setModalAbierto(false)} style={{ position: 'absolute', top: '20px', right: '20px', background: 'var(--bg-main)', border: 'none', borderRadius: '50%', width: '35px', height: '35px', cursor: 'pointer', color: 'var(--text-muted)' }}>✕</button>
+            <h3 style={{ margin: '0 0 20px 0', fontSize: '22px', color: 'var(--text-main)' }}>Ficha de Simpatizante</h3>
             
             <form onSubmit={guardarSimpatizante} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              <input placeholder="Nombre Completo" value={formData.nombreCompleto} onChange={e => setFormData({...formData, nombreCompleto: e.target.value})} required style={{ padding: '12px', border: '1px solid #cbd5e1', borderRadius: '10px', backgroundColor: '#ffffff', color: '#000000' }} />
-              <input placeholder="Cédula" value={formData.cedula} onChange={e => setFormData({...formData, cedula: e.target.value})} required style={{ padding: '12px', border: '1px solid #cbd5e1', borderRadius: '10px', backgroundColor: '#ffffff', color: '#000000' }} />
-              <input placeholder="Teléfono" value={formData.telefono} onChange={e => setFormData({...formData, telefono: e.target.value})} style={{ padding: '12px', border: '1px solid #cbd5e1', borderRadius: '10px', backgroundColor: '#ffffff', color: '#000000' }} />
+              <input placeholder="Nombre Completo" value={formData.nombreCompleto} onChange={e => setFormData({...formData, nombreCompleto: e.target.value})} required style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
+              <input placeholder="Cédula" value={formData.cedula} onChange={e => setFormData({...formData, cedula: e.target.value})} required style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
+              <input placeholder="Teléfono" value={formData.telefono} onChange={e => setFormData({...formData, telefono: e.target.value})} style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
               
               <div style={{ display: 'flex', gap: '10px' }}>
-                <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px', borderRadius: '8px', cursor: 'pointer', background: formData.zona === 'URBANA' ? '#0f172a' : '#f1f5f9', color: formData.zona === 'URBANA' ? 'white' : '#64748b', fontWeight: 'bold' }}>
+                <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px', borderRadius: '8px', cursor: 'pointer', background: formData.zona === 'URBANA' ? 'var(--primary)' : 'var(--bg-input)', color: formData.zona === 'URBANA' ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', fontWeight: 'bold' }}>
                   <input type="radio" name="zona" value="URBANA" checked={formData.zona === 'URBANA'} onChange={() => setFormData({...formData, zona: 'URBANA', barrioVereda: ''})} style={{ display: 'none' }} />
                   🏙️ Urbana
                 </label>
-                <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px', borderRadius: '8px', cursor: 'pointer', background: formData.zona === 'RURAL' ? '#10b981' : '#f1f5f9', color: formData.zona === 'RURAL' ? 'white' : '#64748b', fontWeight: 'bold' }}>
+                <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px', borderRadius: '8px', cursor: 'pointer', background: formData.zona === 'RURAL' ? 'var(--secondary)' : 'var(--bg-input)', color: formData.zona === 'RURAL' ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', fontWeight: 'bold' }}>
                   <input type="radio" name="zona" value="RURAL" checked={formData.zona === 'RURAL'} onChange={() => setFormData({...formData, zona: 'RURAL', barrioVereda: ''})} style={{ display: 'none' }} />
                   🌲 Rural
                 </label>
               </div>
 
-              <select required value={formData.barrioVereda} onChange={e => setFormData({...formData, barrioVereda: e.target.value})} style={{ padding: '12px', border: '1px solid #cbd5e1', borderRadius: '10px', backgroundColor: '#ffffff', color: '#000000' }}>
+              <select required value={formData.barrioVereda} onChange={e => setFormData({...formData, barrioVereda: e.target.value})} style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }}>
                 <option value="" disabled>Selecciona {formData.zona === 'URBANA' ? 'el Barrio' : 'la Vereda'}...</option>
                 {(formData.zona === 'URBANA' ? BARRIOS_URBANOS : VEREDAS_RURALES).map(lugar => (
                   <option key={lugar} value={lugar}>{lugar}</option>
                 ))}
               </select>
 
-              <input placeholder="Dirección exacta o referencia" value={formData.direccion} onChange={e => setFormData({...formData, direccion: e.target.value})} required style={{ padding: '12px', border: '1px solid #cbd5e1', borderRadius: '10px', backgroundColor: '#ffffff', color: '#000000' }} />
+              <input placeholder="Dirección exacta o referencia" value={formData.direccion} onChange={e => setFormData({...formData, direccion: e.target.value})} required style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
 
-              <div style={{ height: '180px', width: '100%', borderRadius: '10px', overflow: 'hidden', border: formData.latitud ? '2px solid #10b981' : '2px solid #cbd5e1', zIndex: 0 }}>
+              <div style={{ height: '180px', width: '100%', borderRadius: '10px', overflow: 'hidden', border: formData.latitud ? '2px solid var(--secondary)' : '2px solid var(--border-color)', zIndex: 0 }}>
                 <MapContainer center={centroCalima} zoom={15} style={{ height: '100%', width: '100%', zIndex: 1 }}>
                   <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                   <SeleccionarUbicacion formData={formData} setFormData={setFormData} />
@@ -900,17 +886,17 @@ function App() {
               </div>
 
               <div style={{ display: 'flex', gap: '15px' }}>
-                <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: formData.apoyaAlcaldia ? '#e0e7ff' : '#f1f5f9', padding: '12px', borderRadius: '10px', cursor: 'pointer', border: formData.apoyaAlcaldia ? '2px solid #6366f1' : '2px solid transparent' }}>
+                <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: formData.apoyaAlcaldia ? 'var(--primary)' : 'var(--bg-input)', color: formData.apoyaAlcaldia ? '#ffffff' : 'var(--text-muted)', padding: '12px', borderRadius: '10px', cursor: 'pointer', border: '1px solid var(--border-color)' }}>
                   <input type="checkbox" checked={formData.apoyaAlcaldia} onChange={e => setFormData({...formData, apoyaAlcaldia: e.target.checked})} style={{ display: 'none' }} />
-                  <span style={{ fontWeight: 'bold', color: formData.apoyaAlcaldia ? '#4338ca' : '#64748b' }}>🏛️ Alcaldía</span>
+                  <span style={{ fontWeight: 'bold' }}>🏛️ Alcaldía</span>
                 </label>
-                <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: formData.apoyaConcejo ? '#dcfce3' : '#f1f5f9', padding: '12px', borderRadius: '10px', cursor: 'pointer', border: formData.apoyaConcejo ? '2px solid #22c55e' : '2px solid transparent' }}>
+                <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: formData.apoyaConcejo ? 'var(--secondary)' : 'var(--bg-input)', color: formData.apoyaConcejo ? '#ffffff' : 'var(--text-muted)', padding: '12px', borderRadius: '10px', cursor: 'pointer', border: '1px solid var(--border-color)' }}>
                   <input type="checkbox" checked={formData.apoyaConcejo} onChange={e => setFormData({...formData, apoyaConcejo: e.target.checked})} style={{ display: 'none' }} />
-                  <span style={{ fontWeight: 'bold', color: formData.apoyaConcejo ? '#15803d' : '#64748b' }}>👥 Concejo</span>
+                  <span style={{ fontWeight: 'bold' }}>👥 Concejo</span>
                 </label>
               </div>
               
-              <button type="submit" style={{ padding: '14px', background: '#0f172a', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>Guardar Ficha</button>
+              <button type="submit" style={{ padding: '14px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '16px' }}>Guardar Ficha</button>
             </form>
           </div>
         </div>
