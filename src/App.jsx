@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 
@@ -55,6 +55,48 @@ const GlobalStyles = () => (
 const BARRIOS_URBANOS = ['Centro', 'Obrero', 'La Carmelita', 'Fundadores', 'Sucre', 'San Vicente', 'El Dorado', 'Laureles', 'Otro'];
 const VEREDAS_RURALES = ['Río Bravo', 'La Florida', 'Jiguales', 'Remolinos', 'La Cristalina', 'Santa Leticia', 'Palermo', 'Gorgona', 'Otra'];
 
+// 🔥 COMPONENTE DE GPS INTELIGENTE
+function BotonCentrarUbicacion({ setFormData }) {
+  const map = useMap();
+  const [posicionGPS, setPosicionGPS] = useState(null);
+
+  const ubicarGPS = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    map.locate({ setView: true, maxZoom: 16 });
+  };
+
+  useMapEvents({
+    locationfound(e) {
+      setPosicionGPS(e.latlng);
+      if (setFormData) {
+        setFormData(prev => ({ ...prev, latitud: e.latlng.lat, longitud: e.latlng.lng }));
+      }
+    },
+    // 🔥 SOLUCIÓN ESLINT: Quitamos la 'e' de la función locationerror
+    locationerror() {
+      alert("No pudimos obtener tu ubicación. Verifica que el GPS esté encendido y le hayas dado permisos al navegador.");
+    }
+  });
+
+  return (
+    <>
+      <button 
+        onClick={ubicarGPS}
+        style={{ position: 'absolute', bottom: '20px', right: '10px', zIndex: 1000, background: 'var(--accent)', color: 'white', border: 'none', borderRadius: '50%', width: '45px', height: '45px', fontSize: '20px', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        title="Centrar en mi ubicación"
+      >
+        🎯
+      </button>
+      {posicionGPS && !setFormData && (
+        <Marker position={posicionGPS}>
+          <Popup>📍 Estás aquí</Popup>
+        </Marker>
+      )}
+    </>
+  );
+}
+
 function SeleccionarUbicacion({ formData, setFormData }) {
   useMapEvents({
     click(e) { setFormData({ ...formData, latitud: e.latlng.lat, longitud: e.latlng.lng }) },
@@ -71,14 +113,12 @@ function App() {
   const [usuariosDb, setUsuariosDb] = useState([]) 
   const [historialConflictos, setHistorialConflictos] = useState([]) 
   
-  // 🔥 AÑADIDOS LOS CAMPOS NUEVOS
   const [formData, setFormData] = useState({ nombreCompleto: '', cedula: '', telefono: '', zona: 'URBANA', barrioVereda: '', direccion: '', latitud: null, longitud: null, apoyaAlcaldia: false, apoyaConcejo: false, mesa: '', observaciones: '' })
 
   const [modalAbierto, setModalAbierto] = useState(false)
   const [modalUsuarioAbierto, setModalUsuarioAbierto] = useState(false)
   const [nuevoUsuarioData, setNuevoUsuarioData] = useState({ nombre: '', cedula: '', telefono: '', rol: 'CONCEJAL', contrasena: '', concejalId: '' })
 
-  // 🔥 ESTADOS PARA EL MODAL DE EDICIÓN
   const [modalEditarAbierto, setModalEditarAbierto] = useState(false)
   const [datosEdicion, setDatosEdicion] = useState({ id: null, mesa: '', observaciones: '' })
 
@@ -252,7 +292,6 @@ function App() {
     }
   }
 
-  // 🔥 NUEVA FUNCIÓN PARA GUARDAR LA EDICIÓN DE MESA Y OBSERVACIONES
   const guardarEdicion = async (e) => {
     e.preventDefault();
     if (!isOnline) return mostrarAlerta("Necesitas internet para editar registros.", "error");
@@ -346,7 +385,6 @@ function App() {
     localStorage.removeItem('usuarioElectoral');
   }
 
-  // --- LÓGICA DE FILTRADO ---
   const simpatizantesPermitidos = simpatizantes.filter(s => {
     if (usuario?.rol === 'ADMIN') return true; 
     if (usuario?.rol === 'CONCEJAL') return s.liderId === usuario.id || s.lider?.concejalId === usuario.id; 
@@ -357,7 +395,6 @@ function App() {
     s.nombreCompleto.toLowerCase().includes(terminoBusqueda.toLowerCase()) || s.cedula.includes(terminoBusqueda)
   );
 
-  // 🔥 NUEVA FUNCIÓN PARA EXPORTAR A EXCEL (CSV)
   const exportarAExcel = () => {
     const cabeceras = ['Nombre Completo', 'Cédula', 'Teléfono', 'Zona', 'Barrio/Vereda', 'Dirección', 'Apoya Alcaldía', 'Apoya Concejo', 'Líder Registrador', 'Mesa Votación', 'Observaciones'];
     
@@ -375,7 +412,6 @@ function App() {
       `"${s.observaciones ? s.observaciones.replace(/\n/g, ' ') : ''}"`
     ]);
 
-    // \uFEFF fuerza a Excel a reconocer los acentos (UTF-8) y usamos ";" que es el estándar de Excel en Colombia
     const contenidoCSV = "data:text/csv;charset=utf-8,\uFEFF" + cabeceras.join(";") + "\n" + filas.map(e => e.join(";")).join("\n");
     const link = document.createElement("a");
     link.setAttribute("href", encodeURI(contenidoCSV));
@@ -550,7 +586,7 @@ function App() {
         </div>
       )}
 
-      {/* 🔥 NUEVO MODAL: EDITAR SIMPATIZANTE (Mesa y Observaciones) */}
+      {/* 🔥 NUEVO MODAL: EDITAR SIMPATIZANTE */}
       {modalEditarAbierto && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
           <div style={{ background: 'var(--bg-card)', padding: '30px', borderRadius: '20px', width: '100%', maxWidth: '400px', boxShadow: 'var(--shadow)', position: 'relative' }}>
@@ -632,7 +668,7 @@ function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
             <img src="/ELECTORA-iso.png" alt="Electora" style={{ width: '45px', height: 'auto' }} />
             <div>
-              <h2 style={{ margin: 0, fontSize: '20px', color: 'var(--text-main)' }}>Hola, {usuario.nombre.split(' ')[0]}</h2>
+              <h2 style={{ margin: '0', fontSize: '20px', color: 'var(--text-main)' }}>Hola, {usuario.nombre.split(' ')[0]}</h2>
               <span style={{ fontSize: '12px', fontWeight: 'bold', background: usuario.rol === 'ADMIN' ? 'var(--primary)' : (usuario.rol === 'CONCEJAL' ? 'var(--secondary)' : 'var(--accent)'), color: '#ffffff', padding: '4px 10px', borderRadius: '12px', display: 'inline-block', marginTop: '5px' }}>
                 {usuario.rol}
               </span>
@@ -778,9 +814,11 @@ function App() {
             </div>
           </div>
           
-          <div style={{ height: '400px', width: '100%', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)', zIndex: 0 }}>
+          <div style={{ position: 'relative', height: '400px', width: '100%', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)', zIndex: 0 }}>
             <MapContainer center={centroCalima} zoom={14} style={{ height: '100%', width: '100%', zIndex: 1 }}>
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              {/* 🔥 BOTÓN GPS EN EL DASHBOARD */}
+              <BotonCentrarUbicacion />
               {simpatizantesMapa.map(s => (
                 <Marker key={s.id} position={[s.latitud, s.longitud]}>
                   <Popup>
@@ -1015,9 +1053,11 @@ function App() {
 
               <input placeholder="Dirección exacta o referencia" value={formData.direccion} onChange={e => setFormData({...formData, direccion: e.target.value})} required style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
 
-              <div style={{ height: '180px', width: '100%', borderRadius: '10px', overflow: 'hidden', border: formData.latitud ? '2px solid var(--secondary)' : '2px solid var(--border-color)', zIndex: 0 }}>
+              <div style={{ position: 'relative', height: '180px', width: '100%', borderRadius: '10px', overflow: 'hidden', border: formData.latitud ? '2px solid var(--secondary)' : '2px solid var(--border-color)', zIndex: 0 }}>
                 <MapContainer center={centroCalima} zoom={15} style={{ height: '100%', width: '100%', zIndex: 1 }}>
                   <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                  {/* 🔥 BOTÓN GPS EN EL FORMULARIO DE REGISTRO */}
+                  <BotonCentrarUbicacion setFormData={setFormData} />
                   <SeleccionarUbicacion formData={formData} setFormData={setFormData} />
                 </MapContainer>
               </div>

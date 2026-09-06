@@ -8,21 +8,26 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg}'] // Atrapa todos los archivos para modo offline
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}'] 
       },
       manifest: {
-        name: 'Panel Electoral Calima',
-        short_name: 'Electoral',
-        description: 'Gestión territorial de campaña',
-        theme_color: '#0f172a',
-        background_color: '#f1f5f9',
+        name: 'Electora Panel',
+        short_name: 'Electora',
+        description: 'Plataforma de gestión territorial',
+        theme_color: '#153c5e',
+        background_color: '#f4f7f6',
         display: 'standalone',
-        // Nota: Más adelante podemos agregar los íconos de la campaña aquí
         icons: [
           {
-            src: 'https://cdn-icons-png.flaticon.com/512/3256/3256114.png', // Ícono temporal
-            sizes: '512x512',
+            src: '/ELECTORA-iso.png', // 👈 Tu logo oficial
+            sizes: '192x192',
             type: 'image/png'
+          },
+          {
+            src: '/ELECTORA-iso.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any maskable'
           }
         ]
       }
