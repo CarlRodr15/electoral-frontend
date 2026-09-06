@@ -1,18 +1,33 @@
+/**
+ * @fileoverview Frontend Principal - Electora PWA
+ * @description Panel de gestión territorial. Incluye soporte Offline-First, geolocalización, 
+ * mapas interactivos con Leaflet, gráficas Recharts y exportación a Excel.
+ * @author Carlos Rodriguez - CIO Calima El Darién
+ * @version 1.1.1 (React Compiler Optimized)
+ */
+
 import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-// 🔥 FIX: Importación de Database agregada
 import { Users, MapPin, Map as MapIcon, PieChart as ChartIcon, BarChart3, LogOut, Search, Edit2, Trash2, UserPlus, Bell, Moon, Sun, Download, ShieldCheck, Crosshair, AlertTriangle, ArrowRightLeft, Database } from 'lucide-react'
 
+// ============================================================================
+// FIX LEAFLET: Corrección de rutas para los íconos de los marcadores del mapa
+// en entornos empaquetados por Vite/Webpack.
+// ============================================================================
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
+
+// ============================================================================
+// COMPONENTES DE UTILIDAD Y UI BASE
+// ============================================================================
 
 const GlobalStyles = () => (
   <style>{`
@@ -60,7 +75,6 @@ const GlobalStyles = () => (
 const BARRIOS_URBANOS = ['Centro', 'Obrero', 'La Carmelita', 'Fundadores', 'Sucre', 'San Vicente', 'El Dorado', 'Laureles', 'Otro'];
 const VEREDAS_RURALES = ['Río Bravo', 'La Florida', 'Jiguales', 'Remolinos', 'La Cristalina', 'Santa Leticia', 'Palermo', 'Gorgona', 'Otra'];
 
-// 🔥 FIX: Tooltip sacado hacia afuera del componente App para optimizar renderizados
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
@@ -89,7 +103,7 @@ function BotonCentrarUbicacion({ setFormData }) {
       setPosicionGPS(e.latlng);
       if (setFormData) setFormData(prev => ({ ...prev, latitud: e.latlng.lat, longitud: e.latlng.lng }));
     },
-    locationerror() { alert("No pudimos obtener tu ubicación. Verifica permisos de GPS."); }
+    locationerror() { alert("No pudimos obtener tu ubicación. Verifica permisos de GPS en tu navegador."); }
   });
 
   return (
@@ -117,41 +131,51 @@ function SeleccionarUbicacion({ formData, setFormData }) {
   return formData.latitud ? <Marker position={[formData.latitud, formData.longitud]} /> : null
 }
 
+// ============================================================================
+// APLICACIÓN PRINCIPAL
+// ============================================================================
+
 function App() {
+  /* --- 1. ESTADOS DE SESIÓN Y UI --- */
   const [usuario, setUsuario] = useState(() => JSON.parse(localStorage.getItem('usuarioElectoral')) || null)
   const [loginData, setLoginData] = useState({ cedula: '', contrasena: '' })
   const [modoOscuro, setModoOscuro] = useState(() => localStorage.getItem('temaElectoral') === 'dark')
 
+  /* --- 2. ESTADOS DE BASE DE DATOS Y COLAS --- */
   const [simpatizantes, setSimpatizantes] = useState([])
   const [usuariosDb, setUsuariosDb] = useState([]) 
   const [historialConflictos, setHistorialConflictos] = useState([]) 
-  
-  const [formData, setFormData] = useState({ nombreCompleto: '', cedula: '', telefono: '', zona: 'URBANA', barrioVereda: '', direccion: '', latitud: null, longitud: null, apoyaAlcaldia: false, apoyaConcejo: false, mesa: '', observaciones: '' })
+  const [colaOffline, setColaOffline] = useState(() => JSON.parse(localStorage.getItem('colaOfflineElectoral')) || [])
+  const [isOnline, setIsOnline] = useState(navigator.onLine)
 
+  /* --- 3. ESTADOS DE FORMULARIOS --- */
+  const [formData, setFormData] = useState({ nombreCompleto: '', cedula: '', telefono: '', zona: 'URBANA', barrioVereda: '', direccion: '', latitud: null, longitud: null, apoyaAlcaldia: false, apoyaConcejo: false, mesa: '', observaciones: '' })
+  const [nuevoUsuarioData, setNuevoUsuarioData] = useState({ nombre: '', cedula: '', telefono: '', rol: 'CONCEJAL', contrasena: '', concejalId: '' })
+  const [datosEdicion, setDatosEdicion] = useState({ id: null, mesa: '', observaciones: '' })
+  const [liderDestino, setLiderDestino] = useState('')
+
+  /* --- 4. ESTADOS DE CONTROL DE MODALES Y FILTROS --- */
   const [modalAbierto, setModalAbierto] = useState(false)
   const [modalUsuarioAbierto, setModalUsuarioAbierto] = useState(false)
-  const [nuevoUsuarioData, setNuevoUsuarioData] = useState({ nombre: '', cedula: '', telefono: '', rol: 'CONCEJAL', contrasena: '', concejalId: '' })
-
   const [modalEditarAbierto, setModalEditarAbierto] = useState(false)
-  const [datosEdicion, setDatosEdicion] = useState({ id: null, mesa: '', observaciones: '' })
+  const [modalHistorialAbierto, setModalHistorialAbierto] = useState(false)
+  const [modalConfirmacion, setModalConfirmacion] = useState({ visible: false, tipo: '', datos: null })
+  const [modalTransferir, setModalTransferir] = useState({ visible: false, datos: null })
+  const [notificacion, setNotificacion] = useState({ visible: false, mensaje: '', tipo: 'info' })
 
   const [vistaAdmin, setVistaAdmin] = useState('simpatizantes') 
   const [terminoBusqueda, setTerminoBusqueda] = useState('')
   const [equipoExpandido, setEquipoExpandido] = useState(null)
+  
   const [filtroMapaInteractivo, setFiltroMapaInteractivo] = useState({ tipo: 'TODOS', id: null, nombre: '' })
   const [filtroZonaMapa, setFiltroZonaMapa] = useState('TODOS') 
   const [filtroLugarMapa, setFiltroLugarMapa] = useState('TODOS')
 
-  const [notificacion, setNotificacion] = useState({ visible: false, mensaje: '', tipo: 'info' })
-  const [modalConfirmacion, setModalConfirmacion] = useState({ visible: false, tipo: '', datos: null })
-  const [modalTransferir, setModalTransferir] = useState({ visible: false, datos: null })
-  const [liderDestino, setLiderDestino] = useState('')
-
-  const [isOnline, setIsOnline] = useState(navigator.onLine)
-  const [colaOffline, setColaOffline] = useState(() => JSON.parse(localStorage.getItem('colaOfflineElectoral')) || [])
-  const [modalHistorialAbierto, setModalHistorialAbierto] = useState(false)
-
   const centroCalima = [3.9274, -76.4851]
+
+  /* ========================================================================
+     CICLO DE VIDA Y EFECTOS
+     ======================================================================== */
 
   useEffect(() => {
     if (modoOscuro) {
@@ -181,14 +205,14 @@ function App() {
         const resAlertas = await axios.get('https://api-electoral-calima.onrender.com/api/alertas');
         setHistorialConflictos(resAlertas.data);
       }
-    } catch (error) { console.error(error); }
+    } catch (error) { console.error("Error al cargar datos:", error); }
   }, [usuario]);
 
   const agregarConflicto = useCallback(async (cedula, nombre, motivo) => {
     try {
       await axios.post('https://api-electoral-calima.onrender.com/api/alertas', { cedula, nombre, motivo });
       cargarDatosIniciales(); 
-    } catch (error) { console.error(error); }
+    } catch (error) { console.error("Error al registrar alerta en la nube", error); }
   }, [cargarDatosIniciales]);
 
   const sincronizarPendientes = useCallback(async () => {
@@ -219,7 +243,7 @@ function App() {
 
   useEffect(() => {
     const manejarConexion = () => { setIsOnline(true); mostrarAlerta("Conexión recuperada.", "exito"); sincronizarPendientes(); };
-    const manejarDesconexion = () => { setIsOnline(false); mostrarAlerta("Sin conexión. Modo Offline.", "error"); };
+    const manejarDesconexion = () => { setIsOnline(false); mostrarAlerta("Sin conexión. Modo Offline activo.", "error"); };
     window.addEventListener('online', manejarConexion);
     window.addEventListener('offline', manejarDesconexion);
     const timerSync = setTimeout(() => { if (navigator.onLine && usuario) sincronizarPendientes(); }, 0);
@@ -231,6 +255,10 @@ function App() {
     const intervaloSincronizacion = setInterval(cargarDatosIniciales, 10000);
     return () => { clearTimeout(timerDatos); clearInterval(intervaloSincronizacion); };
   }, [cargarDatosIniciales])
+
+  /* ========================================================================
+     CONTROLADORES DE API (CRUD)
+     ======================================================================== */
 
   const manejarLogin = async (e) => {
     e.preventDefault();
@@ -268,7 +296,7 @@ function App() {
       if (error.response?.status === 400) {
         agregarConflicto(formData.cedula, formData.nombreCompleto, "Cédula Duplicada Manual");
         mostrarAlerta("Cédula duplicada. Revisa notificaciones.", 'error'); 
-      } else { mostrarAlerta("Error de conexión.", 'error'); }
+      } else { mostrarAlerta("Error de conexión al servidor.", 'error'); }
     }
   }
 
@@ -277,12 +305,12 @@ function App() {
     if (!isOnline) return mostrarAlerta("Requiere internet.", "error");
     try {
       await axios.put(`https://api-electoral-calima.onrender.com/api/simpatizantes/${datosEdicion.id}`, { mesa: datosEdicion.mesa, observaciones: datosEdicion.observaciones });
-      mostrarAlerta("Datos actualizados.", "exito");
+      mostrarAlerta("Datos adicionales actualizados.", "exito");
       cargarDatosIniciales();
       setModalEditarAbierto(false);
     } catch (error) { 
-      console.error(error); // 🔥 FIX: Consumiendo la variable error
-      mostrarAlerta("Error al actualizar", "error"); 
+      console.error(error); 
+      mostrarAlerta("Error al actualizar la base de datos", "error"); 
     }
   }
 
@@ -291,7 +319,7 @@ function App() {
     if (!isOnline) return mostrarAlerta("Requiere internet.", "error");
     try {
       await axios.post('https://api-electoral-calima.onrender.com/api/usuarios', nuevoUsuarioData);
-      mostrarAlerta(`Usuario creado.`, 'exito');
+      mostrarAlerta(`Estructura creada.`, 'exito');
       cargarDatosIniciales();
       setModalUsuarioAbierto(false);
       setNuevoUsuarioData({ nombre: '', cedula: '', telefono: '', rol: 'CONCEJAL', contrasena: '', concejalId: '' });
@@ -303,10 +331,10 @@ function App() {
     try {
       await axios.delete(`https://api-electoral-calima.onrender.com/api/simpatizantes/${modalConfirmacion.datos.id}`);
       cargarDatosIniciales();
-      mostrarAlerta("Registro eliminado.", 'exito');
+      mostrarAlerta("Registro purgado.", 'exito');
       setFiltroMapaInteractivo({ tipo: 'TODOS', id: null, nombre: '' }); 
     } catch (error) { 
-      console.error(error); // 🔥 FIX: Consumiendo la variable error
+      console.error(error); 
       mostrarAlerta("Error al eliminar.", 'error'); 
     }
     setModalConfirmacion({ visible: false, tipo: '', datos: null });
@@ -317,10 +345,10 @@ function App() {
     try {
       await axios.delete(`https://api-electoral-calima.onrender.com/api/usuarios/${modalConfirmacion.datos.id}`, { data: { accion: accion, adminId: usuario.id } });
       cargarDatosIniciales();
-      mostrarAlerta("Usuario eliminado.", 'exito');
+      mostrarAlerta("Usuario eliminado del organigrama.", 'exito');
       setFiltroMapaInteractivo({ tipo: 'TODOS', id: null, nombre: '' });
     } catch (error) { 
-      console.error(error); // 🔥 FIX: Consumiendo la variable error
+      console.error(error); 
       mostrarAlerta("Error al eliminar el usuario.", 'error'); 
     }
     setModalConfirmacion({ visible: false, tipo: '', datos: null });
@@ -333,13 +361,13 @@ function App() {
     try {
       await axios.put(`https://api-electoral-calima.onrender.com/api/simpatizantes/${modalTransferir.datos.id}/transferir`, { nuevoLiderId: liderDestino });
       cargarDatosIniciales();
-      mostrarAlerta("Reasignado con éxito.", "exito");
+      mostrarAlerta("Simpatizante reasignado con éxito.", "exito");
       setModalTransferir({ visible: false, datos: null });
       setLiderDestino('');
       setFiltroMapaInteractivo({ tipo: 'TODOS', id: null, nombre: '' });
     } catch (error) { 
-      console.error(error); // 🔥 FIX: Consumiendo la variable error
-      mostrarAlerta("Error en transferencia.", "error"); 
+      console.error(error); 
+      mostrarAlerta("Error en transferencia estructural.", "error"); 
     }
   }
 
@@ -348,22 +376,18 @@ function App() {
     try {
       await axios.delete('https://api-electoral-calima.onrender.com/api/alertas');
       setHistorialConflictos([]);
-      mostrarAlerta("Auditoría limpia.", "exito");
+      mostrarAlerta("Auditoría purgada.", "exito");
     } catch (error) { console.error(error); }
   };
 
-  const cerrarSesion = () => { setUsuario(null); setSimpatizantes([]); setUsuariosDb([]); setTerminoBusqueda(''); localStorage.removeItem('usuarioElectoral'); }
+  const cerrarSesion = () => { 
+    setUsuario(null); setSimpatizantes([]); setUsuariosDb([]); setTerminoBusqueda(''); localStorage.removeItem('usuarioElectoral'); 
+  }
 
-  const simpatizantesPermitidos = simpatizantes.filter(s => {
-    if (usuario?.rol === 'ADMIN') return true; 
-    if (usuario?.rol === 'CONCEJAL') return s.liderId === usuario.id || s.lider?.concejalId === usuario.id; 
-    return s.liderId === usuario?.id; 
-  });
-
-  const simpatizantesVisibles = simpatizantesPermitidos.filter(s => 
-    s.nombreCompleto.toLowerCase().includes(terminoBusqueda.toLowerCase()) || s.cedula.includes(terminoBusqueda)
-  );
-
+  /**
+   * @function exportarAExcel
+   * @description Extrae la vista actual de datos a formato CSV respetando UTF-8 (Tildes).
+   */
   const exportarAExcel = () => {
     const cabeceras = ['Nombre Completo', 'Cédula', 'Teléfono', 'Zona', 'Barrio/Vereda', 'Dirección', 'Apoya Alcaldía', 'Apoya Concejo', 'Líder Registrador', 'Mesa Votación', 'Observaciones'];
     const filas = simpatizantesVisibles.map(s => [
@@ -377,6 +401,20 @@ function App() {
     link.click();
     document.body.removeChild(link);
   };
+
+  /* ========================================================================
+     LÓGICA DE FILTRADO Y MÉTRICAS (React Compiler Auto-Memoized)
+     ======================================================================== */
+
+  const simpatizantesPermitidos = simpatizantes.filter(s => {
+    if (usuario?.rol === 'ADMIN') return true; 
+    if (usuario?.rol === 'CONCEJAL') return s.liderId === usuario.id || s.lider?.concejalId === usuario.id; 
+    return s.liderId === usuario?.id; 
+  });
+
+  const simpatizantesVisibles = simpatizantesPermitidos.filter(s => 
+    s.nombreCompleto.toLowerCase().includes(terminoBusqueda.toLowerCase()) || s.cedula.includes(terminoBusqueda)
+  );
 
   const lideresPermitidos = usuariosDb.filter(u => {
     if (usuario?.rol === 'ADMIN') return u.rol === 'LIDER' || u.rol === 'CONCEJAL';
@@ -401,7 +439,7 @@ function App() {
     return true;
   });
 
-  // PREPARACIÓN DE DATOS PARA RECHARTS
+  // Preparación de datos para Recharts
   const agruparPorLugar = (zona) => {
     const filtrados = simpatizantesMetricas.filter(s => s.zona === zona);
     const conteo = {};
@@ -422,11 +460,14 @@ function App() {
     { name: 'Sin Definir', value: sinApoyo > 0 ? sinApoyo : 0, color: 'var(--border-color)' }
   ].filter(d => d.value > 0);
 
+  /* ========================================================================
+     RENDERIZADO VISUAL
+     ======================================================================== */
+
   if (!usuario) {
     return (
       <div style={{ minHeight: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
         <GlobalStyles />
-        
         <button onClick={alternarTema} style={{ position: 'fixed', top: '20px', right: '20px', background: 'var(--bg-card)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '50%', width: '45px', height: '45px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--shadow)' }}>
           {modoOscuro ? <Sun size={20} /> : <Moon size={20} />}
         </button>
@@ -458,6 +499,7 @@ function App() {
     <div style={{ padding: '20px', width: '100vw', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <GlobalStyles />
       
+      {/* 📡 STATUS BAR */}
       <div style={{ position: 'fixed', top: '10px', right: '20px', display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-card)', padding: '6px 12px', borderRadius: '20px', boxShadow: 'var(--shadow)', zIndex: 9999, border: '1px solid var(--border-color)' }}>
         <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: isOnline ? 'var(--secondary)' : 'var(--danger)', boxShadow: isOnline ? '0 0 8px var(--secondary)' : '0 0 8px var(--danger)' }}></div>
         <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-muted)', marginRight: '10px' }}>{isOnline ? 'En línea' : 'Offline'}</span>
@@ -480,6 +522,7 @@ function App() {
         </div>
       )}
 
+      {/* --- MODALES DEL SISTEMA --- */}
       {modalHistorialAbierto && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
           <div style={{ background: 'var(--bg-card)', padding: '30px', borderRadius: '20px', width: '100%', maxWidth: '500px', maxHeight: '80vh', overflowY: 'auto', boxShadow: 'var(--shadow)', position: 'relative' }}>
@@ -513,7 +556,6 @@ function App() {
         </div>
       )}
 
-      {/* MODAL CREAR EQUIPO */}
       {modalUsuarioAbierto && usuario.rol === 'ADMIN' && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
           <div style={{ background: 'var(--bg-card)', padding: '30px', borderRadius: '20px', width: '100%', maxWidth: '400px', boxShadow: 'var(--shadow)', position: 'relative' }}>
@@ -521,13 +563,11 @@ function App() {
             <h3 style={{ margin: '0 0 20px 0', color: 'var(--text-main)', fontSize: '22px', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <UserPlus size={24} color="var(--primary)" /> Nuevo Miembro
             </h3>
-            
             <form onSubmit={crearUsuarioDesdeAdmin} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               <select value={nuevoUsuarioData.rol} onChange={e => setNuevoUsuarioData({...nuevoUsuarioData, rol: e.target.value, concejalId: ''})} required style={{ padding: '14px', borderRadius: '10px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)', fontWeight: 'bold' }}>
                 <option value="CONCEJAL">Candidato al Concejo</option>
                 <option value="LIDER">Líder de Campaña</option>
               </select>
-
               {nuevoUsuarioData.rol === 'LIDER' && (
                 <select value={nuevoUsuarioData.concejalId} onChange={e => setNuevoUsuarioData({...nuevoUsuarioData, concejalId: e.target.value})} required style={{ padding: '14px', borderRadius: '10px', border: '2px solid var(--secondary)', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }}>
                   <option value="" disabled>Selecciona a qué Concejal pertenece...</option>
@@ -536,19 +576,16 @@ function App() {
                   ))}
                 </select>
               )}
-
               <input placeholder="Nombre Completo" required value={nuevoUsuarioData.nombre} onChange={e => setNuevoUsuarioData({...nuevoUsuarioData, nombre: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
               <input placeholder="Cédula" required value={nuevoUsuarioData.cedula} onChange={e => setNuevoUsuarioData({...nuevoUsuarioData, cedula: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
               <input placeholder="Teléfono" required value={nuevoUsuarioData.telefono} onChange={e => setNuevoUsuarioData({...nuevoUsuarioData, telefono: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
               <input type="password" placeholder="Asignar Contraseña" required value={nuevoUsuarioData.contrasena} onChange={e => setNuevoUsuarioData({...nuevoUsuarioData, contrasena: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
-              
               <button type="submit" style={{ padding: '16px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>Guardar Usuario</button>
             </form>
           </div>
         </div>
       )}
 
-      {/* MODAL EDITAR */}
       {modalEditarAbierto && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
           <div style={{ background: 'var(--bg-card)', padding: '30px', borderRadius: '20px', width: '100%', maxWidth: '400px', boxShadow: 'var(--shadow)', position: 'relative' }}>
@@ -556,28 +593,15 @@ function App() {
             <h3 style={{ margin: '0 0 20px 0', color: 'var(--text-main)', fontSize: '22px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Edit2 size={24} color="var(--accent)" /> Completar Datos
             </h3>
-            
             <form onSubmit={guardarEdicion} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              <input 
-                placeholder="Número de Mesa (Ej: Mesa 4)" 
-                value={datosEdicion.mesa} 
-                onChange={e => setDatosEdicion({...datosEdicion, mesa: e.target.value})} 
-                style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} 
-              />
-              <textarea 
-                placeholder="Observaciones adicionales (transporte, salud, etc.)" 
-                rows="4"
-                value={datosEdicion.observaciones} 
-                onChange={e => setDatosEdicion({...datosEdicion, observaciones: e.target.value})} 
-                style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)', resize: 'none' }} 
-              />
+              <input placeholder="Número de Mesa (Ej: Mesa 4)" value={datosEdicion.mesa} onChange={e => setDatosEdicion({...datosEdicion, mesa: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
+              <textarea placeholder="Observaciones adicionales (transporte, salud, etc.)" rows="4" value={datosEdicion.observaciones} onChange={e => setDatosEdicion({...datosEdicion, observaciones: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)', resize: 'none' }} />
               <button type="submit" style={{ padding: '16px', background: 'var(--secondary)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>Guardar Cambios</button>
             </form>
           </div>
         </div>
       )}
 
-      {/* MODAL TRANSFERIR */}
       {modalTransferir.visible && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
           <div style={{ background: 'var(--bg-card)', padding: '30px', borderRadius: '20px', width: '100%', maxWidth: '400px', boxShadow: 'var(--shadow)' }}>
@@ -600,7 +624,6 @@ function App() {
         </div>
       )}
 
-      {/* MODAL CONFIRMAR ELIMINAR */}
       {modalConfirmacion.visible && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
           <div style={{ background: 'var(--bg-card)', padding: '30px', borderRadius: '20px', width: '100%', maxWidth: '400px', textAlign: 'center', boxShadow: 'var(--shadow)' }}>
@@ -638,7 +661,6 @@ function App() {
               </span>
             </div>
           </div>
-
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
             <button onClick={alternarTema} style={{ padding: '10px', background: 'var(--bg-main)', border: '1px solid var(--border-color)', borderRadius: '50%', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '42px', height: '42px' }}>
               {modoOscuro ? <Sun size={20} /> : <Moon size={20} />}
@@ -679,11 +701,8 @@ function App() {
         {/* 📈 DASHBOARD DE GRÁFICOS REALES (RECHARTS) */}
         <div style={{ display: 'flex', gap: '20px', marginTop: '25px', flexWrap: 'wrap' }}>
           
-          {/* GRÁFICO BARRAS: BARRIOS */}
           <div style={{ flex: '1 1 350px', background: 'var(--bg-card)', padding: '25px', borderRadius: '16px', boxShadow: 'var(--shadow)', border: '1px solid var(--border-color)' }}>
-            <h3 style={{ margin: '0 0 20px 0', color: 'var(--text-main)', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <BarChart3 size={20} color="var(--primary)" /> Top Barrios Urbanos
-            </h3>
+            <h3 style={{ margin: '0 0 20px 0', color: 'var(--text-main)', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><BarChart3 size={20} color="var(--primary)" /> Top Barrios Urbanos</h3>
             {datosTopBarrios.length === 0 ? <p style={{color: 'var(--text-muted)', fontSize: '14px', textAlign: 'center'}}>Sin datos.</p> : (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={datosTopBarrios} layout="vertical" margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
@@ -695,12 +714,8 @@ function App() {
               </ResponsiveContainer>
             )}
           </div>
-
-          {/* GRÁFICO BARRAS: VEREDAS */}
           <div style={{ flex: '1 1 350px', background: 'var(--bg-card)', padding: '25px', borderRadius: '16px', boxShadow: 'var(--shadow)', border: '1px solid var(--border-color)' }}>
-            <h3 style={{ margin: '0 0 20px 0', color: 'var(--text-main)', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <BarChart3 size={20} color="var(--accent)" /> Top Veredas Rurales
-            </h3>
+            <h3 style={{ margin: '0 0 20px 0', color: 'var(--text-main)', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><BarChart3 size={20} color="var(--accent)" /> Top Veredas Rurales</h3>
             {datosTopVeredas.length === 0 ? <p style={{color: 'var(--text-muted)', fontSize: '14px', textAlign: 'center'}}>Sin datos.</p> : (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={datosTopVeredas} layout="vertical" margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
@@ -712,12 +727,8 @@ function App() {
               </ResponsiveContainer>
             )}
           </div>
-
-          {/* GRÁFICO PASTEL: INTENCIÓN VOTO */}
           <div style={{ flex: '1 1 350px', background: 'var(--bg-card)', padding: '25px', borderRadius: '16px', boxShadow: 'var(--shadow)', border: '1px solid var(--border-color)' }}>
-            <h3 style={{ margin: '0 0 10px 0', color: 'var(--text-main)', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ChartIcon size={20} color="var(--primary)" /> Intención de Voto
-            </h3>
+            <h3 style={{ margin: '0 0 10px 0', color: 'var(--text-main)', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><ChartIcon size={20} color="var(--primary)" /> Intención de Voto</h3>
             {datosIntencionVoto.length === 0 ? <p style={{color: 'var(--text-muted)', fontSize: '14px', textAlign: 'center', marginTop: '40px'}}>Sin datos.</p> : (
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
@@ -730,16 +741,12 @@ function App() {
               </ResponsiveContainer>
             )}
           </div>
-
         </div>
 
         {/* 🗺️ MAPA TERRITORIAL */}
         <div style={{ marginTop: '25px', background: 'var(--bg-card)', padding: '25px', borderRadius: '16px', boxShadow: 'var(--shadow)', border: '1px solid var(--border-color)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
-            <h3 style={{ margin: 0, color: 'var(--text-main)', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <MapPin size={22} color="var(--primary)" /> Análisis Espacial
-            </h3>
-            
+            <h3 style={{ margin: 0, color: 'var(--text-main)', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}><MapPin size={22} color="var(--primary)" /> Análisis Espacial</h3>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               <select value={filtroLugarMapa} onChange={(e) => { const val = e.target.value; setFiltroLugarMapa(val); if (BARRIOS_URBANOS.includes(val)) setFiltroZonaMapa('URBANA'); if (VEREDAS_RURALES.includes(val)) setFiltroZonaMapa('RURAL'); }} style={{ padding: '10px 15px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)', fontWeight: 'bold', cursor: 'pointer' }}>
                 <option value="TODOS">Todas las zonas</option>
@@ -753,7 +760,6 @@ function App() {
               )}
             </div>
           </div>
-          
           <div style={{ position: 'relative', height: '450px', width: '100%', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)', zIndex: 0 }}>
             <MapContainer center={centroCalima} zoom={14} style={{ height: '100%', width: '100%', zIndex: 1 }}>
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
@@ -783,13 +789,11 @@ function App() {
               </button>
             )}
           </div>
-          
           <div style={{ display: 'flex', gap: '10px', width: '100%', maxWidth: '500px' }}>
             <div style={{ position: 'relative', flex: 1 }}>
               <Search size={18} color="var(--text-muted)" style={{ position: 'absolute', top: '14px', left: '15px' }} />
               <input type="text" placeholder="Buscar por cédula o nombre..." value={terminoBusqueda} onChange={(e) => setTerminoBusqueda(e.target.value)} style={{ padding: '12px 20px 12px 45px', borderRadius: '30px', border: '1px solid var(--border-color)', width: '100%', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
             </div>
-            
             {vistaAdmin === 'simpatizantes' && (
               <button onClick={exportarAExcel} style={{ padding: '12px 20px', borderRadius: '30px', border: 'none', background: 'var(--secondary)', color: 'white', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Download size={18} /> Excel
@@ -808,14 +812,12 @@ function App() {
                   <div style={{ flex: 1 }}>
                     <strong style={{ fontSize: '16px', color: 'var(--text-main)', display: 'block', marginBottom: '4px' }}>{simp.nombreCompleto}</strong>
                     <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Cédula: <strong>{simp.cedula}</strong> &nbsp;•&nbsp; {simp.zona}: {simp.barrioVereda}</div>
-                    
                     {(simp.mesa || simp.observaciones) && (
                       <div style={{ marginTop: '10px', padding: '10px 15px', background: 'var(--bg-card)', borderRadius: '8px', borderLeft: '3px solid var(--accent)' }}>
                         {simp.mesa && <div style={{ fontSize: '13px', color: 'var(--text-main)', marginBottom: '4px' }}><strong>Mesa de Votación:</strong> {simp.mesa}</div>}
                         {simp.observaciones && <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>"{simp.observaciones}"</div>}
                       </div>
                     )}
-
                     {usuario.rol !== 'LIDER' && simp.lider && (
                       <div style={{ color: 'var(--primary)', fontSize: '12px', marginTop: '10px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px' }}>
                         <UserPlus size={14} /> Registrado por: {simp.lider.nombre}
@@ -825,11 +827,9 @@ function App() {
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                     {simp.apoyaAlcaldia && <span style={{ background: 'var(--primary)', color: 'white', padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>Alcaldía</span>}
                     {simp.apoyaConcejo && <span style={{ background: 'var(--secondary)', color: 'white', padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>Concejo</span>}
-                    
                     <button onClick={() => { setDatosEdicion({ id: simp.id, mesa: simp.mesa || '', observaciones: simp.observaciones || '' }); setModalEditarAbierto(true); }} style={{ background: 'transparent', color: 'var(--accent)', border: '1px solid var(--accent)', borderRadius: '8px', padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Editar Datos Adicionales">
                       <Edit2 size={16} />
                     </button>
-
                     {usuario.rol === 'ADMIN' && (
                       <button onClick={() => setModalTransferir({ visible: true, datos: { id: simp.id, nombre: simp.nombreCompleto } })} style={{ background: 'transparent', color: 'var(--primary)', border: '1px solid var(--primary)', borderRadius: '8px', padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }} title="Reasignar Líder">
                         <ArrowRightLeft size={16} />
@@ -846,7 +846,6 @@ function App() {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              
               {usuario.rol === 'CONCEJAL' && (
                 <>
                   {lideresPermitidos.length === 0 ? <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0' }}>Aún no tienes líderes a tu cargo.</p> : null}
@@ -854,11 +853,7 @@ function App() {
                     const registrosLider = simpatizantes.filter(s => s.liderId === lider.id).length;
                     const esLiderSeleccionado = filtroMapaInteractivo.tipo === 'LIDER' && filtroMapaInteractivo.id === lider.id;
                     return (
-                      <div 
-                        key={lider.id} 
-                        onClick={() => setFiltroMapaInteractivo({ tipo: 'LIDER', id: lider.id, nombre: lider.nombre })}
-                        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', border: esLiderSeleccionado ? '2px solid var(--secondary)' : '1px solid var(--border-color)', background: 'var(--bg-input)', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s' }}
-                      >
+                      <div key={lider.id} onClick={() => setFiltroMapaInteractivo({ tipo: 'LIDER', id: lider.id, nombre: lider.nombre })} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', border: esLiderSeleccionado ? '2px solid var(--secondary)' : '1px solid var(--border-color)', background: 'var(--bg-input)', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s' }}>
                         <div>
                           <strong style={{ fontSize: '16px', color: 'var(--text-main)', display: 'block', marginBottom: '4px' }}>{lider.nombre}</strong> 
                           <span style={{ fontSize: '10px', background: 'var(--secondary)', color: 'white', padding: '2px 8px', borderRadius: '4px', textTransform: 'uppercase' }}>Líder</span>
@@ -873,7 +868,6 @@ function App() {
                   })}
                 </>
               )}
-
               {usuario.rol === 'ADMIN' && (
                 <>
                   {concejalesLista.map(concejal => {
@@ -881,13 +875,9 @@ function App() {
                     const registrosDelEquipo = simpatizantes.filter(s => s.lider?.concejalId === concejal.id || s.liderId === concejal.id).length;
                     const estaExpandido = equipoExpandido === concejal.id;
                     const estaSeleccionadoMapa = filtroMapaInteractivo.tipo === 'CONCEJAL' && filtroMapaInteractivo.id === concejal.id;
-
                     return (
                       <div key={concejal.id} style={{ display: 'flex', flexDirection: 'column', border: estaSeleccionadoMapa ? '2px solid var(--primary)' : '1px solid var(--border-color)', background: 'var(--bg-input)', borderRadius: '12px', overflow: 'hidden', transition: 'all 0.3s ease' }}>
-                        <div 
-                          onClick={() => { setFiltroMapaInteractivo({ tipo: 'CONCEJAL', id: concejal.id, nombre: concejal.nombre }); setEquipoExpandido(estaExpandido ? null : concejal.id); }}
-                          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', cursor: 'pointer', background: estaExpandido ? 'var(--bg-card)' : 'transparent' }}
-                        >
+                        <div onClick={() => { setFiltroMapaInteractivo({ tipo: 'CONCEJAL', id: concejal.id, nombre: concejal.nombre }); setEquipoExpandido(estaExpandido ? null : concejal.id); }} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', cursor: 'pointer', background: estaExpandido ? 'var(--bg-card)' : 'transparent' }}>
                           <div>
                             <strong style={{ fontSize: '18px', color: 'var(--text-main)', display: 'block', marginBottom: '4px' }}>{concejal.nombre}</strong> 
                             <span style={{ fontSize: '10px', background: 'var(--primary)', color: 'white', padding: '2px 8px', borderRadius: '4px', textTransform: 'uppercase' }}>Candidato al Concejo</span>
@@ -903,7 +893,6 @@ function App() {
                             </button>
                           </div>
                         </div>
-
                         {estaExpandido && (
                           <div style={{ background: 'var(--bg-card)', padding: '20px', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Estructura de Líderes</h4>
@@ -912,11 +901,7 @@ function App() {
                               const registrosLider = simpatizantes.filter(s => s.liderId === lider.id).length;
                               const esLiderSeleccionado = filtroMapaInteractivo.tipo === 'LIDER' && filtroMapaInteractivo.id === lider.id;
                               return (
-                                <div 
-                                  key={lider.id} 
-                                  onClick={(e) => { e.stopPropagation(); setFiltroMapaInteractivo({ tipo: 'LIDER', id: lider.id, nombre: lider.nombre }); }}
-                                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px', borderLeft: esLiderSeleccionado ? '4px solid var(--secondary)' : '4px solid var(--border-color)', background: 'var(--bg-input)', borderRadius: '0 8px 8px 0', cursor: 'pointer' }}
-                                >
+                                <div key={lider.id} onClick={(e) => { e.stopPropagation(); setFiltroMapaInteractivo({ tipo: 'LIDER', id: lider.id, nombre: lider.nombre }); }} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px', borderLeft: esLiderSeleccionado ? '4px solid var(--secondary)' : '4px solid var(--border-color)', background: 'var(--bg-input)', borderRadius: '0 8px 8px 0', cursor: 'pointer' }}>
                                   <div>
                                     <strong style={{ fontSize: '15px', color: 'var(--text-main)' }}>{lider.nombre}</strong>
                                     <div style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '4px' }}>C.C. {lider.cedula}</div>
@@ -938,17 +923,12 @@ function App() {
                       </div>
                     )
                   })}
-
                   {lideresIndependientes.length > 0 && <h4 style={{ margin: '20px 0 0 0', fontSize: '14px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Líderes Directos (Alcaldía)</h4>}
                   {lideresIndependientes.map(lider => {
                     const registros = simpatizantes.filter(s => s.liderId === lider.id).length;
                     const esLiderSeleccionado = filtroMapaInteractivo.tipo === 'LIDER' && filtroMapaInteractivo.id === lider.id;
                     return (
-                      <div 
-                        key={lider.id} 
-                        onClick={() => setFiltroMapaInteractivo({ tipo: 'LIDER', id: lider.id, nombre: lider.nombre })}
-                        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', border: esLiderSeleccionado ? '2px solid var(--secondary)' : '1px solid var(--border-color)', background: 'var(--bg-input)', borderRadius: '12px', cursor: 'pointer' }}
-                      >
+                      <div key={lider.id} onClick={() => setFiltroMapaInteractivo({ tipo: 'LIDER', id: lider.id, nombre: lider.nombre })} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', border: esLiderSeleccionado ? '2px solid var(--secondary)' : '1px solid var(--border-color)', background: 'var(--bg-input)', borderRadius: '12px', cursor: 'pointer' }}>
                         <div>
                           <strong style={{ fontSize: '16px', color: 'var(--text-main)', display: 'block', marginBottom: '4px' }}>{lider.nombre}</strong> 
                           <span style={{ fontSize: '10px', background: 'var(--secondary)', color: 'white', padding: '2px 8px', borderRadius: '4px', textTransform: 'uppercase' }}>Líder</span>
@@ -956,7 +936,7 @@ function App() {
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                           <div style={{ textAlign: 'center', background: 'var(--bg-card)', padding: '10px 20px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                            <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase' }}>Aportes</span>
+                            <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', textTransform: 'uppercase' }}>Registros</span>
                             <span style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text-main)' }}>{registros}</span>
                           </div>
                           <button onClick={(e) => { e.stopPropagation(); setModalConfirmacion({ visible: true, tipo: 'eliminar_lider', datos: { id: lider.id, nombre: lider.nombre } }); }} style={{ background: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '8px', padding: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
@@ -993,20 +973,19 @@ function App() {
             <h3 style={{ margin: '0 0 20px 0', fontSize: '22px', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '10px' }}><UserPlus size={24} color="var(--accent)" /> Registro</h3>
             
             <form onSubmit={guardarSimpatizante} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              <input placeholder="Nombre Completo" value={formData.nombreCompleto} onChange={e => setFormData({...formData, nombreCompleto: e.target.value})} required style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
-              <input placeholder="Cédula" value={formData.cedula} onChange={e => setFormData({...formData, cedula: e.target.value})} required style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
-              <input placeholder="Teléfono" value={formData.telefono} onChange={e => setFormData({...formData, telefono: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
+              <input placeholder="Nombre Completo" value={formData.nombreCompleto} onChange={e => setFormData({...formData, nombreCompleto: e.target.value})} required style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
+              <input placeholder="Cédula" value={formData.cedula} onChange={e => setFormData({...formData, cedula: e.target.value})} required style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
+              <input placeholder="Teléfono" value={formData.telefono} onChange={e => setFormData({...formData, telefono: e.target.value})} style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
               
-              {/* CAMPOS OPCIONALES NUEVOS */}
               <input placeholder="Mesa de Votación (Opcional)" value={formData.mesa} onChange={e => setFormData({...formData, mesa: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
               <textarea placeholder="Observaciones (transporte, etc.) (Opcional)" rows="2" value={formData.observaciones} onChange={e => setFormData({...formData, observaciones: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)', resize: 'none' }} />
 
               <div style={{ display: 'flex', gap: '10px' }}>
-                <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px', borderRadius: '8px', cursor: 'pointer', background: formData.zona === 'URBANA' ? 'var(--primary)' : 'var(--bg-input)', color: formData.zona === 'URBANA' ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', fontWeight: 'bold' }}>
+                <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px', borderRadius: '8px', cursor: 'pointer', background: formData.zona === 'URBANA' ? 'var(--primary)' : 'var(--bg-input)', color: formData.zona === 'URBANA' ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', fontWeight: 'bold' }}>
                   <input type="radio" name="zona" value="URBANA" checked={formData.zona === 'URBANA'} onChange={() => setFormData({...formData, zona: 'URBANA', barrioVereda: ''})} style={{ display: 'none' }} />
                   Urbana
                 </label>
-                <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px', borderRadius: '8px', cursor: 'pointer', background: formData.zona === 'RURAL' ? 'var(--secondary)' : 'var(--bg-input)', color: formData.zona === 'RURAL' ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', fontWeight: 'bold' }}>
+                <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px', borderRadius: '8px', cursor: 'pointer', background: formData.zona === 'RURAL' ? 'var(--secondary)' : 'var(--bg-input)', color: formData.zona === 'RURAL' ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', fontWeight: 'bold' }}>
                   <input type="radio" name="zona" value="RURAL" checked={formData.zona === 'RURAL'} onChange={() => setFormData({...formData, zona: 'RURAL', barrioVereda: ''})} style={{ display: 'none' }} />
                   Rural
                 </label>
@@ -1014,9 +993,7 @@ function App() {
 
               <select required value={formData.barrioVereda} onChange={e => setFormData({...formData, barrioVereda: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }}>
                 <option value="" disabled>Selecciona {formData.zona === 'URBANA' ? 'Barrio' : 'Vereda'}...</option>
-                {(formData.zona === 'URBANA' ? BARRIOS_URBANOS : VEREDAS_RURALES).map(lugar => (
-                  <option key={lugar} value={lugar}>{lugar}</option>
-                ))}
+                {(formData.zona === 'URBANA' ? BARRIOS_URBANOS : VEREDAS_RURALES).map(lugar => <option key={lugar} value={lugar}>{lugar}</option>)}
               </select>
 
               <input placeholder="Dirección o referencia" value={formData.direccion} onChange={e => setFormData({...formData, direccion: e.target.value})} required style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
@@ -1039,7 +1016,6 @@ function App() {
                   <span style={{ fontWeight: 'bold' }}>Apoya Concejo</span>
                 </label>
               </div>
-              
               <button type="submit" style={{ padding: '16px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '16px', marginTop: '10px' }}>Guardar Registro</button>
             </form>
           </div>
