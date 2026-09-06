@@ -11,7 +11,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// 🔥 VARIABLES CSS: Aquí está inyectada la paleta de tu Logo y el Modo Oscuro
 const GlobalStyles = () => (
   <style>{`
     :root {
@@ -21,9 +20,9 @@ const GlobalStyles = () => (
       --text-main: #112a46;
       --text-muted: #64748b;
       --border-color: #cbd5e1;
-      --primary: #153c5e; /* Azul de tu Logo */
-      --secondary: #369c84; /* Verde Teal de tu Logo */
-      --accent: #f28b30; /* Naranja de tu Logo */
+      --primary: #153c5e; 
+      --secondary: #369c84; 
+      --accent: #f28b30; 
       --danger: #ef4444;
       --shadow: 0 4px 15px rgba(0,0,0,0.05);
     }
@@ -48,7 +47,11 @@ const GlobalStyles = () => (
     @keyframes slideIn { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .grafica-barra { transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
     
-    input, select { outline: none; }
+    /* 🔥 EL ESCUDO ANTI-ZOOM: Forzamos 16px en todos los inputs */
+    input, select, textarea { 
+      font-size: 16px !important; 
+      outline: none; 
+    }
     input:focus, select:focus { border-color: var(--secondary) !important; box-shadow: 0 0 0 2px rgba(54, 156, 132, 0.2); }
   `}</style>
 )
@@ -64,18 +67,14 @@ function SeleccionarUbicacion({ formData, setFormData }) {
 }
 
 function App() {
+  // --- 1. ESTADOS PRINCIPALES ---
   const [usuario, setUsuario] = useState(() => JSON.parse(localStorage.getItem('usuarioElectoral')) || null)
-  const [pinAdmin, setPinAdmin] = useState('------')
-  const [segundosRestantes, setSegundosRestantes] = useState(60 - new Date().getSeconds())
   const [loginData, setLoginData] = useState({ cedula: '', contrasena: '' })
-  
-  // 🔥 ESTADO DEL MODO OSCURO
-  const [modoOscuro, setModoOscuro] = useState(() => {
-    return localStorage.getItem('temaElectoral') === 'dark';
-  })
+  const [modoOscuro, setModoOscuro] = useState(() => localStorage.getItem('temaElectoral') === 'dark')
 
   const [simpatizantes, setSimpatizantes] = useState([])
   const [usuariosDb, setUsuariosDb] = useState([]) 
+  const [historialConflictos, setHistorialConflictos] = useState([]) 
   const [formData, setFormData] = useState({ nombreCompleto: '', cedula: '', telefono: '', zona: 'URBANA', barrioVereda: '', direccion: '', latitud: null, longitud: null, apoyaAlcaldia: false, apoyaConcejo: false })
 
   const [modalAbierto, setModalAbierto] = useState(false)
@@ -84,7 +83,6 @@ function App() {
 
   const [vistaAdmin, setVistaAdmin] = useState('simpatizantes') 
   const [terminoBusqueda, setTerminoBusqueda] = useState('')
-  
   const [equipoExpandido, setEquipoExpandido] = useState(null)
   const [filtroMapaInteractivo, setFiltroMapaInteractivo] = useState({ tipo: 'TODOS', id: null, nombre: '' })
   const [filtroZonaMapa, setFiltroZonaMapa] = useState('TODOS') 
@@ -97,12 +95,11 @@ function App() {
 
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [colaOffline, setColaOffline] = useState(() => JSON.parse(localStorage.getItem('colaOfflineElectoral')) || [])
-  const [historialConflictos, setHistorialConflictos] = useState(() => JSON.parse(localStorage.getItem('historialConflictosElectoral')) || [])
   const [modalHistorialAbierto, setModalHistorialAbierto] = useState(false)
 
   const centroCalima = [3.9274, -76.4851]
 
-  // EFECTO PARA CAMBIAR EL TEMA
+  // --- 2. FUNCIONES BASE (Ordenadas para evitar errores de Linting) ---
   useEffect(() => {
     if (modoOscuro) {
       document.documentElement.setAttribute('data-theme', 'dark');
@@ -120,19 +117,6 @@ function App() {
     setTimeout(() => setNotificacion({ visible: false, mensaje: '', tipo: 'info' }), 4000);
   }, []);
 
-  const agregarConflicto = useCallback((cedula, nombre, motivo) => {
-    setHistorialConflictos(prev => {
-      const nuevo = [{ id: Date.now(), cedula, nombre, motivo, fecha: new Date().toLocaleString() }, ...prev];
-      localStorage.setItem('historialConflictosElectoral', JSON.stringify(nuevo));
-      return nuevo;
-    });
-  }, []);
-
-  const limpiarHistorial = () => {
-    setHistorialConflictos([]);
-    localStorage.removeItem('historialConflictosElectoral');
-  };
-
   const cargarDatosIniciales = useCallback(async () => {
     if (!navigator.onLine || !usuario) return; 
     try {
@@ -141,9 +125,20 @@ function App() {
       if (usuario.rol === 'ADMIN' || usuario.rol === 'CONCEJAL') {
         const resUsu = await axios.get('https://api-electoral-calima.onrender.com/api/usuarios');
         setUsuariosDb(resUsu.data);
+        const resAlertas = await axios.get('https://api-electoral-calima.onrender.com/api/alertas');
+        setHistorialConflictos(resAlertas.data);
       }
     } catch (error) { console.error(error); }
   }, [usuario]);
+
+  const agregarConflicto = useCallback(async (cedula, nombre, motivo) => {
+    try {
+      await axios.post('https://api-electoral-calima.onrender.com/api/alertas', { cedula, nombre, motivo });
+      cargarDatosIniciales(); 
+    } catch (error) {
+      console.error("Error al registrar alerta en la nube", error);
+    }
+  }, [cargarDatosIniciales]);
 
   const sincronizarPendientes = useCallback(async () => {
     const pendientes = JSON.parse(localStorage.getItem('colaOfflineElectoral')) || [];
@@ -160,7 +155,7 @@ function App() {
       } catch (error) {
         if (error.response && error.response.status === 400) {
           restantes = restantes.filter(r => r.cedula !== registro.cedula);
-          agregarConflicto(registro.cedula, registro.nombreCompleto, "Duplicado en Sincronización Offline");
+          agregarConflicto(registro.cedula, registro.nombreCompleto, "Duplicado tras modo Offline");
         }
       }
     }
@@ -174,6 +169,7 @@ function App() {
     }
   }, [agregarConflicto, cargarDatosIniciales, mostrarAlerta]);
 
+  // --- 3. EFECTOS (Ciclo de vida) ---
   useEffect(() => {
     const manejarConexion = () => {
       setIsOnline(true);
@@ -203,40 +199,14 @@ function App() {
     const timerDatos = setTimeout(() => {
       cargarDatosIniciales();
     }, 0);
-    
     const intervaloSincronizacion = setInterval(cargarDatosIniciales, 10000);
-    
     return () => {
       clearTimeout(timerDatos);
       clearInterval(intervaloSincronizacion);
     };
   }, [cargarDatosIniciales])
 
-  useEffect(() => {
-    if (usuario?.rol === 'ADMIN') {
-      const cargarPin = async () => {
-        if (!navigator.onLine) return;
-        try {
-          const res = await axios.get('https://api-electoral-calima.onrender.com/api/pin-seguridad');
-          setPinAdmin(res.data.pin);
-        } catch (error) { console.error(error); }
-      };
-      
-      const timerPin = setTimeout(() => { cargarPin(); }, 0);
-      
-      const intervalo = setInterval(() => {
-        const seg = new Date().getSeconds();
-        setSegundosRestantes(60 - seg);
-        if (seg === 0) cargarPin();
-      }, 1000);
-      
-      return () => {
-        clearTimeout(timerPin);
-        clearInterval(intervalo);
-      };
-    }
-  }, [usuario])
-
+  // --- 4. ACCIONES DEL USUARIO ---
   const manejarLogin = async (e) => {
     e.preventDefault()
     if (!navigator.onLine) return mostrarAlerta("Necesitas internet para iniciar sesión por primera vez.", "error");
@@ -288,7 +258,7 @@ function App() {
     e.preventDefault();
     if (!isOnline) return mostrarAlerta("Necesitas internet para crear usuarios.", "error");
     try {
-      await axios.post('https://api-electoral-calima.onrender.com/api/usuarios', { ...nuevoUsuarioData, codigoAutorizacion: pinAdmin });
+      await axios.post('https://api-electoral-calima.onrender.com/api/usuarios', nuevoUsuarioData);
       mostrarAlerta(`¡${nuevoUsuarioData.rol} creado con éxito!`, 'exito');
       cargarDatosIniciales();
       setModalUsuarioAbierto(false);
@@ -344,6 +314,17 @@ function App() {
     }
   }
 
+  const limpiarHistorial = async () => {
+    if (!isOnline) return mostrarAlerta("Necesitas internet para limpiar el registro.", "error");
+    try {
+      await axios.delete('https://api-electoral-calima.onrender.com/api/alertas');
+      setHistorialConflictos([]);
+      mostrarAlerta("Historial de auditoría limpio.", "exito");
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const cerrarSesion = () => {
     setUsuario(null); 
     setSimpatizantes([]); 
@@ -352,6 +333,7 @@ function App() {
     localStorage.removeItem('usuarioElectoral');
   }
 
+  // --- 5. LÓGICA DE FILTRADO ---
   const simpatizantesPermitidos = simpatizantes.filter(s => {
     if (usuario?.rol === 'ADMIN') return true; 
     if (usuario?.rol === 'CONCEJAL') return s.liderId === usuario.id || s.lider?.concejalId === usuario.id; 
@@ -399,12 +381,12 @@ function App() {
   const votosAlcaldia = simpatizantesMetricas.filter(s => s.apoyaAlcaldia).length;
   const votosConcejo = simpatizantesMetricas.filter(s => s.apoyaConcejo).length;
 
+  // --- 6. RENDERIZADO VISUAL ---
   if (!usuario) {
     return (
       <div style={{ minHeight: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
         <GlobalStyles />
         
-        {/* BOTÓN TEMA OSCURO FLOTANTE */}
         <button onClick={alternarTema} style={{ position: 'fixed', top: '20px', right: '20px', background: 'var(--bg-card)', color: 'var(--text-main)', border: '1px solid var(--border-color)', borderRadius: '50%', width: '45px', height: '45px', cursor: 'pointer', fontSize: '20px', boxShadow: 'var(--shadow)' }}>
           {modoOscuro ? '☀️' : '🌙'}
         </button>
@@ -416,7 +398,6 @@ function App() {
         )}
         <div style={{ background: 'var(--bg-card)', padding: '40px 30px', borderRadius: '20px', boxShadow: 'var(--shadow)', width: '100%', maxWidth: '400px' }}>
           <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-            {/* 🔥 EL LOGO INTEGRADO EN EL LOGIN */}
             <img src="/ELECTORA-iso.png" alt="Electora Logo" style={{ width: '90px', marginBottom: '15px' }} />
             <h1 style={{ color: 'var(--text-main)', margin: '0 0 5px 0', fontSize: '26px' }}>Electora</h1>
             <p style={{ color: 'var(--text-muted)', margin: 0 }}>Calima El Darién</p>
@@ -435,23 +416,23 @@ function App() {
     <div style={{ padding: '20px', width: '100vw', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <GlobalStyles />
       
-      {/* 📡 INDICADOR DE RED Y NOTIFICACIONES */}
       <div style={{ position: 'fixed', top: '10px', right: '20px', display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-card)', padding: '6px 12px', borderRadius: '20px', boxShadow: 'var(--shadow)', zIndex: 9999 }}>
         <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: isOnline ? 'var(--secondary)' : 'var(--danger)', boxShadow: isOnline ? '0 0 8px var(--secondary)' : '0 0 8px var(--danger)' }}></div>
         <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-muted)', marginRight: '10px' }}>{isOnline ? 'Conectado' : 'Offline'}</span>
         
-        {/* 🔔 BOTÓN DE HISTORIAL DE CONFLICTOS */}
-        <button 
-          onClick={() => setModalHistorialAbierto(true)}
-          style={{ background: 'transparent', border: 'none', cursor: 'pointer', position: 'relative', fontSize: '16px', padding: 0 }}
-        >
-          🔔
-          {historialConflictos.length > 0 && (
-            <span style={{ position: 'absolute', top: '-5px', right: '-8px', background: 'var(--danger)', color: 'white', fontSize: '9px', fontWeight: 'bold', padding: '2px 5px', borderRadius: '10px' }}>
-              {historialConflictos.length}
-            </span>
-          )}
-        </button>
+        {(usuario.rol === 'ADMIN' || usuario.rol === 'CONCEJAL') && (
+          <button 
+            onClick={() => setModalHistorialAbierto(true)}
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', position: 'relative', fontSize: '16px', padding: 0 }}
+          >
+            🔔
+            {historialConflictos.length > 0 && (
+              <span style={{ position: 'absolute', top: '-5px', right: '-8px', background: 'var(--danger)', color: 'white', fontSize: '9px', fontWeight: 'bold', padding: '2px 5px', borderRadius: '10px' }}>
+                {historialConflictos.length}
+              </span>
+            )}
+          </button>
+        )}
         
         {colaOffline.length > 0 && <span style={{ fontSize: '12px', background: 'var(--accent)', color: '#ffffff', padding: '2px 6px', borderRadius: '10px', fontWeight: 'bold', marginLeft: '10px' }}>{colaOffline.length} en cola</span>}
       </div>
@@ -462,13 +443,13 @@ function App() {
         </div>
       )}
 
-      {/* 🛑 MODAL: HISTORIAL DE CONFLICTOS */}
+      {/* --- RESTAURACIÓN DE MODALES VISUALES --- */}
       {modalHistorialAbierto && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
           <div style={{ background: 'var(--bg-card)', padding: '30px', borderRadius: '20px', width: '100%', maxWidth: '500px', maxHeight: '80vh', overflowY: 'auto', boxShadow: 'var(--shadow)', position: 'relative' }}>
             <button onClick={() => setModalHistorialAbierto(false)} style={{ position: 'absolute', top: '20px', right: '20px', background: 'var(--bg-main)', border: 'none', borderRadius: '50%', width: '35px', height: '35px', cursor: 'pointer', color: 'var(--text-muted)' }}>✕</button>
-            <h3 style={{ margin: '0 0 5px 0', color: 'var(--text-main)', fontSize: '22px' }}>🔔 Auditoría de Registros</h3>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '20px', fontSize: '14px' }}>Historial de cédulas duplicadas o rechazadas.</p>
+            <h3 style={{ margin: '0 0 5px 0', color: 'var(--text-main)', fontSize: '22px' }}>🔔 Auditoría Global</h3>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '20px', fontSize: '14px' }}>Conflictos registrados en toda la red.</p>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {historialConflictos.length === 0 ? (
@@ -480,17 +461,97 @@ function App() {
                     <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
                       <strong>Cédula:</strong> {conflicto.cedula} <br/>
                       <strong>Nombre:</strong> {conflicto.nombre} <br/>
-                      <strong>Hora del intento:</strong> {conflicto.fecha}
+                      <strong>Hora:</strong> {new Date(conflicto.fecha).toLocaleString()}
                     </div>
                   </div>
                 ))
               )}
             </div>
 
-            {historialConflictos.length > 0 && (
+            {historialConflictos.length > 0 && usuario.rol === 'ADMIN' && (
               <button onClick={limpiarHistorial} style={{ width: '100%', padding: '12px', marginTop: '20px', background: 'var(--bg-main)', color: 'var(--text-main)', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>
-                Limpiar Historial
+                Limpiar Historial Global
               </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CREAR USUARIO RESTAURADO */}
+      {modalUsuarioAbierto && usuario.rol === 'ADMIN' && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
+          <div style={{ background: 'var(--bg-card)', padding: '30px', borderRadius: '20px', width: '100%', maxWidth: '400px', boxShadow: 'var(--shadow)', position: 'relative' }}>
+            <button onClick={() => setModalUsuarioAbierto(false)} style={{ position: 'absolute', top: '20px', right: '20px', background: 'var(--bg-main)', border: 'none', borderRadius: '50%', width: '35px', height: '35px', cursor: 'pointer', color: 'var(--text-muted)' }}>✕</button>
+            <h3 style={{ margin: '0 0 20px 0', color: 'var(--text-main)', fontSize: '22px' }}>➕ Nuevo Miembro</h3>
+            
+            <form onSubmit={crearUsuarioDesdeAdmin} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <select value={nuevoUsuarioData.rol} onChange={e => setNuevoUsuarioData({...nuevoUsuarioData, rol: e.target.value, concejalId: ''})} required style={{ padding: '14px', borderRadius: '10px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)', fontWeight: 'bold' }}>
+                <option value="CONCEJAL">Candidato al Concejo</option>
+                <option value="LIDER">Líder de Campaña</option>
+              </select>
+
+              {nuevoUsuarioData.rol === 'LIDER' && (
+                <select value={nuevoUsuarioData.concejalId} onChange={e => setNuevoUsuarioData({...nuevoUsuarioData, concejalId: e.target.value})} required style={{ padding: '14px', borderRadius: '10px', border: '2px solid var(--secondary)', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }}>
+                  <option value="" disabled>Selecciona a qué Concejal pertenece...</option>
+                  {usuariosDb.filter(u => u.rol === 'CONCEJAL').map(c => (
+                    <option key={c.id} value={c.id}>Concejal: {c.nombre}</option>
+                  ))}
+                </select>
+              )}
+
+              <input placeholder="Nombre Completo" required value={nuevoUsuarioData.nombre} onChange={e => setNuevoUsuarioData({...nuevoUsuarioData, nombre: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
+              <input placeholder="Cédula" required value={nuevoUsuarioData.cedula} onChange={e => setNuevoUsuarioData({...nuevoUsuarioData, cedula: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
+              <input placeholder="Teléfono" required value={nuevoUsuarioData.telefono} onChange={e => setNuevoUsuarioData({...nuevoUsuarioData, telefono: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
+              <input type="password" placeholder="Asignar Contraseña" required value={nuevoUsuarioData.contrasena} onChange={e => setNuevoUsuarioData({...nuevoUsuarioData, contrasena: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
+              
+              <button type="submit" style={{ padding: '16px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>Guardar Usuario</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODALES DE TRANSFERENCIA Y CONFIRMACIÓN RESTAURADOS */}
+      {modalTransferir.visible && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
+          <div style={{ background: 'var(--bg-card)', padding: '30px', borderRadius: '20px', width: '100%', maxWidth: '400px', boxShadow: 'var(--shadow)' }}>
+            <h3 style={{ margin: '0 0 15px 0', color: 'var(--text-main)', fontSize: '22px' }}>🔄 Reasignar Simpatizante</h3>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '20px', fontSize: '15px' }}>Elige el nuevo líder para <strong>{modalTransferir.datos.nombre}</strong>.</p>
+            <form onSubmit={ejecutarTransferencia} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <select value={liderDestino} onChange={(e) => setLiderDestino(e.target.value)} required style={{ padding: '14px', borderRadius: '10px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)', outline: 'none' }}>
+                <option value="" disabled>Selecciona el nuevo destino...</option>
+                <option value={usuario.id}>Mi equipo (Admin)</option>
+                {lideresPermitidos.map(l => (
+                  <option key={l.id} value={l.id}>{l.nombre} ({l.rol})</option>
+                ))}
+              </select>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button type="button" onClick={() => { setModalTransferir({visible: false, datos: null}); setLiderDestino(''); }} style={{ flex: 1, padding: '12px', background: 'var(--bg-main)', color: 'var(--text-main)', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>Cancelar</button>
+                <button type="submit" style={{ flex: 1, padding: '12px', background: 'var(--secondary)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>Transferir</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {modalConfirmacion.visible && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
+          <div style={{ background: 'var(--bg-card)', padding: '30px', borderRadius: '20px', width: '100%', maxWidth: '400px', textAlign: 'center', boxShadow: 'var(--shadow)' }}>
+            <h3 style={{ margin: '0 0 15px 0', color: 'var(--text-main)', fontSize: '22px' }}>⚠️ Confirmar Acción</h3>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '25px', fontSize: '15px' }}>
+              Estás a punto de eliminar a <strong>{modalConfirmacion.datos.nombre}</strong>.
+            </p>
+            {modalConfirmacion.tipo === 'eliminar_simpatizante' && (
+              <div style={{ display: 'flex', gap: '15px' }}>
+                <button onClick={() => setModalConfirmacion({ visible: false, tipo: '', datos: null })} style={{ flex: 1, padding: '12px', background: 'var(--bg-main)', color: 'var(--text-main)', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>Cancelar</button>
+                <button onClick={confirmarEliminarSimpatizante} style={{ flex: 1, padding: '12px', background: 'var(--danger)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>Eliminar</button>
+              </div>
+            )}
+            {modalConfirmacion.tipo === 'eliminar_lider' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <button onClick={() => confirmarEliminarLider('transferir')} style={{ width: '100%', padding: '14px', background: 'var(--secondary)', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>📦 Eliminar y TRANSFERIR registros</button>
+                <button onClick={() => confirmarEliminarLider('borrar_todo')} style={{ width: '100%', padding: '14px', background: 'transparent', color: 'var(--danger)', border: '2px solid var(--danger)', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold' }}>🗑️ Borrar TODO</button>
+                <button onClick={() => setModalConfirmacion({ visible: false, tipo: '', datos: null })} style={{ width: '100%', padding: '12px', background: 'transparent', color: 'var(--text-muted)', border: 'none', cursor: 'pointer', fontWeight: 'bold', marginTop: '10px' }}>Cancelar</button>
+              </div>
             )}
           </div>
         </div>
@@ -498,10 +559,9 @@ function App() {
 
       <div style={{ width: '100%', maxWidth: '1200px' }}>
         
-        {/* HEADER DE LA APP - AHORA CON LOGO Y BOTÓN DE TEMA */}
+        {/* HEADER LIMPIO */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--bg-card)', padding: '15px 25px', borderRadius: '16px', flexWrap: 'wrap', gap: '15px', marginTop: '20px', boxShadow: 'var(--shadow)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            {/* 🔥 EL LOGO EN EL HEADER */}
             <img src="/ELECTORA-iso.png" alt="Electora" style={{ width: '45px', height: 'auto' }} />
             <div>
               <h2 style={{ margin: 0, fontSize: '20px', color: 'var(--text-main)' }}>Hola, {usuario.nombre.split(' ')[0]}</h2>
@@ -512,31 +572,14 @@ function App() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
-            
-            {/* BOTÓN TEMA OSCURO */}
             <button onClick={alternarTema} style={{ padding: '8px', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '50%', cursor: 'pointer', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px' }}>
               {modoOscuro ? '☀️' : '🌙'}
             </button>
 
             {usuario.rol === 'ADMIN' && (
-              <>
-                <div style={{ background: 'var(--bg-main)', padding: '8px 20px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '15px', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>PIN DE ACCESO</span>
-                    <span style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--accent)' }}>{pinAdmin}</span>
-                  </div>
-                  <div style={{ position: 'relative', width: '36px', height: '36px' }}>
-                    <svg width="36" height="36" viewBox="0 0 36 36" style={{ transform: 'rotate(-90deg)' }}>
-                      <circle cx="18" cy="18" r="15" stroke="var(--border-color)" strokeWidth="4" fill="none" />
-                      <circle cx="18" cy="18" r="15" stroke="var(--secondary)" strokeWidth="4" fill="none" strokeDasharray={94.2} strokeDashoffset={94.2 - (segundosRestantes / 60) * 94.2} style={{ transition: 'stroke-dashoffset 1s linear' }} />
-                    </svg>
-                    <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-main)', fontSize: '12px', fontWeight: 'bold' }}>{segundosRestantes}</div>
-                  </div>
-                </div>
-                <button onClick={() => setModalUsuarioAbierto(true)} style={{ padding: '10px 20px', background: 'var(--secondary)', color: '#ffffff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  ➕ Equipo
-                </button>
-              </>
+              <button onClick={() => setModalUsuarioAbierto(true)} style={{ padding: '10px 20px', background: 'var(--secondary)', color: '#ffffff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                ➕ Equipo
+              </button>
             )}
             <button onClick={cerrarSesion} style={{ padding: '10px 20px', background: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Salir</button>
           </div>
