@@ -481,7 +481,7 @@ function App() {
           <div style={{ textAlign: 'center', marginBottom: '30px' }}>
             <img src="/ELECTORA-iso.png" alt="Electora Logo" style={{ width: '90px', marginBottom: '15px' }} />
             <h1 style={{ color: 'var(--text-main)', margin: '0 0 5px 0', fontSize: '26px', fontWeight: '800' }}>Electora</h1>
-            <p style={{ color: 'var(--text-muted)', margin: 0 }}>Gestión Territorial SaaS</p>
+            <p style={{ color: 'var(--text-muted)', margin: 0 }}>Herramienta De Gestión Electoral</p>
           </div>
           <form onSubmit={manejarLogin} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             <input placeholder="Número de Cédula" required onChange={e => setLoginData({...loginData, cedula: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
