@@ -3,7 +3,7 @@
  * @description Panel de gestión territorial. Incluye soporte Offline-First, geolocalización, 
  * mapas interactivos con Leaflet, gráficas Recharts y exportación a Excel.
  * @author Carlos Rodriguez - CIO Calima El Darién
- * @version 1.1.1 (React Compiler Optimized)
+ * @version 1.2.0 (Cartografía Calima El Darién Integrada)
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -72,8 +72,21 @@ const GlobalStyles = () => (
   `}</style>
 )
 
-const BARRIOS_URBANOS = ['Centro', 'Obrero', 'La Carmelita', 'Fundadores', 'Sucre', 'San Vicente', 'El Dorado', 'Laureles', 'Otro'];
-const VEREDAS_RURALES = ['Río Bravo', 'La Florida', 'Jiguales', 'Remolinos', 'La Cristalina', 'Santa Leticia', 'Palermo', 'Gorgona', 'Otra'];
+// 🔥 TERRITORIO DE CALIMA EL DARIÉN (Ordenado alfabéticamente para mejor UX)
+const BARRIOS_URBANOS = [
+  'Altos del Darién', 'Bellavista', 'Canadá', 'Cincuentenario', 'Ciudadela Germán Mejía', 
+  'Colinas del Eden', 'Dos Quebradas', 'El Bosque', 'Guayacanes I', 'Guayacanes II', 
+  'Jorge Eliécer Gaitán', 'La Esperanza', 'La Palma', 'La Virgen', 'Los Almendros', 
+  'Los Fundadores', 'Obrero', 'San Antonio', 'San Isidro', 'San Jorge', 'San Vicente', 
+  'Urbanización Portales de San Jose', 'Otro'
+];
+
+const VEREDAS_RURALES = [
+  'Berlín', 'El Boleo', 'El Diamante', 'El Mirador', 'El Remolino', 'El Vergel', 
+  'Jiguales', 'La Camelia', 'La Cecilia', 'La Cristalina', 'La Florida', 'La Gaviota', 
+  'La Guaira', 'La Italia', 'La Primavera', 'La Rivera', 'La Unión', 'Madroñal', 
+  'Puente Tierra', 'Río Bravo', 'San José', 'Santa Helena', 'Otra'
+];
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
@@ -481,7 +494,7 @@ function App() {
           <div style={{ textAlign: 'center', marginBottom: '30px' }}>
             <img src="/ELECTORA-iso.png" alt="Electora Logo" style={{ width: '90px', marginBottom: '15px' }} />
             <h1 style={{ color: 'var(--text-main)', margin: '0 0 5px 0', fontSize: '26px', fontWeight: '800' }}>Electora</h1>
-            <p style={{ color: 'var(--text-muted)', margin: 0 }}>Herramienta De Gestión Electoral</p>
+            <p style={{ color: 'var(--text-muted)', margin: 0 }}>Gestión Territorial SaaS</p>
           </div>
           <form onSubmit={manejarLogin} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             <input placeholder="Número de Cédula" required onChange={e => setLoginData({...loginData, cedula: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
@@ -680,7 +693,6 @@ function App() {
             </div>
             <p style={{ fontSize: '36px', margin: 0, fontWeight: '800', color: 'var(--text-main)' }}>{simpatizantesMetricas.length}</p>
           </div>
-          
           <div onClick={() => { setFiltroZonaMapa('URBANA'); setFiltroLugarMapa('TODOS'); }} style={{ flex: '1 1 200px', background: 'var(--bg-card)', padding: '25px', borderRadius: '16px', borderTop: '4px solid var(--secondary)', cursor: 'pointer', transition: 'all 0.2s', boxShadow: 'var(--shadow)', border: filtroZonaMapa === 'URBANA' ? '2px solid var(--secondary)' : '1px solid var(--border-color)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
               <h3 style={{ margin: '0', color: 'var(--text-muted)', fontSize: '13px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px' }}>Fuerza Urbana</h3>
@@ -688,7 +700,6 @@ function App() {
             </div>
             <p style={{ fontSize: '36px', margin: 0, fontWeight: '800', color: 'var(--text-main)' }}>{simpatizantesMetricas.filter(s => s.zona === 'URBANA').length}</p>
           </div>
-
           <div onClick={() => { setFiltroZonaMapa('RURAL'); setFiltroLugarMapa('TODOS'); }} style={{ flex: '1 1 200px', background: 'var(--bg-card)', padding: '25px', borderRadius: '16px', borderTop: '4px solid var(--accent)', cursor: 'pointer', transition: 'all 0.2s', boxShadow: 'var(--shadow)', border: filtroZonaMapa === 'RURAL' ? '2px solid var(--accent)' : '1px solid var(--border-color)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
               <h3 style={{ margin: '0', color: 'var(--text-muted)', fontSize: '13px', textTransform: 'uppercase', fontWeight: 'bold', letterSpacing: '0.5px' }}>Fuerza Rural</h3>
@@ -700,7 +711,6 @@ function App() {
 
         {/* 📈 DASHBOARD DE GRÁFICOS REALES (RECHARTS) */}
         <div style={{ display: 'flex', gap: '20px', marginTop: '25px', flexWrap: 'wrap' }}>
-          
           <div style={{ flex: '1 1 350px', background: 'var(--bg-card)', padding: '25px', borderRadius: '16px', boxShadow: 'var(--shadow)', border: '1px solid var(--border-color)' }}>
             <h3 style={{ margin: '0 0 20px 0', color: 'var(--text-main)', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}><BarChart3 size={20} color="var(--primary)" /> Top Barrios Urbanos</h3>
             {datosTopBarrios.length === 0 ? <p style={{color: 'var(--text-muted)', fontSize: '14px', textAlign: 'center'}}>Sin datos.</p> : (
@@ -973,19 +983,20 @@ function App() {
             <h3 style={{ margin: '0 0 20px 0', fontSize: '22px', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '10px' }}><UserPlus size={24} color="var(--accent)" /> Registro</h3>
             
             <form onSubmit={guardarSimpatizante} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              <input placeholder="Nombre Completo" value={formData.nombreCompleto} onChange={e => setFormData({...formData, nombreCompleto: e.target.value})} required style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
-              <input placeholder="Cédula" value={formData.cedula} onChange={e => setFormData({...formData, cedula: e.target.value})} required style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
-              <input placeholder="Teléfono" value={formData.telefono} onChange={e => setFormData({...formData, telefono: e.target.value})} style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
+              <input placeholder="Nombre Completo" value={formData.nombreCompleto} onChange={e => setFormData({...formData, nombreCompleto: e.target.value})} required style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
+              <input placeholder="Cédula" value={formData.cedula} onChange={e => setFormData({...formData, cedula: e.target.value})} required style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
+              <input placeholder="Teléfono" value={formData.telefono} onChange={e => setFormData({...formData, telefono: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
               
+              {/* CAMPOS OPCIONALES NUEVOS */}
               <input placeholder="Mesa de Votación (Opcional)" value={formData.mesa} onChange={e => setFormData({...formData, mesa: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
               <textarea placeholder="Observaciones (transporte, etc.) (Opcional)" rows="2" value={formData.observaciones} onChange={e => setFormData({...formData, observaciones: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)', resize: 'none' }} />
 
               <div style={{ display: 'flex', gap: '10px' }}>
-                <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px', borderRadius: '8px', cursor: 'pointer', background: formData.zona === 'URBANA' ? 'var(--primary)' : 'var(--bg-input)', color: formData.zona === 'URBANA' ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', fontWeight: 'bold' }}>
+                <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px', borderRadius: '8px', cursor: 'pointer', background: formData.zona === 'URBANA' ? 'var(--primary)' : 'var(--bg-input)', color: formData.zona === 'URBANA' ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', fontWeight: 'bold' }}>
                   <input type="radio" name="zona" value="URBANA" checked={formData.zona === 'URBANA'} onChange={() => setFormData({...formData, zona: 'URBANA', barrioVereda: ''})} style={{ display: 'none' }} />
                   Urbana
                 </label>
-                <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px', borderRadius: '8px', cursor: 'pointer', background: formData.zona === 'RURAL' ? 'var(--secondary)' : 'var(--bg-input)', color: formData.zona === 'RURAL' ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', fontWeight: 'bold' }}>
+                <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px', borderRadius: '8px', cursor: 'pointer', background: formData.zona === 'RURAL' ? 'var(--secondary)' : 'var(--bg-input)', color: formData.zona === 'RURAL' ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', fontWeight: 'bold' }}>
                   <input type="radio" name="zona" value="RURAL" checked={formData.zona === 'RURAL'} onChange={() => setFormData({...formData, zona: 'RURAL', barrioVereda: ''})} style={{ display: 'none' }} />
                   Rural
                 </label>
