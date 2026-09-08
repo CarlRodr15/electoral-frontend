@@ -3,7 +3,7 @@
  * @description Panel de gestión territorial. Incluye soporte Offline-First, geolocalización, 
  * mapas interactivos con Leaflet, gráficas Recharts y exportación a Excel.
  * @author Carlos Rodriguez - CIO Calima El Darién
- * @version 1.2.0 (Cartografía Calima El Darién Integrada)
+ * @version 1.3.0 (Network & Render Optimized)
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -12,22 +12,14 @@ import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 're
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { Users, MapPin, Map as MapIcon, PieChart as ChartIcon, BarChart3, LogOut, Search, Edit2, Trash2, UserPlus, Bell, Moon, Sun, Download, ShieldCheck, Crosshair, AlertTriangle, ArrowRightLeft, Database } from 'lucide-react'
+import { Users, MapPin, Map as MapIcon, PieChart as ChartIcon, BarChart3, LogOut, Search, Edit2, Trash2, UserPlus, Bell, Moon, Sun, Download, ShieldCheck, Crosshair, AlertTriangle, ArrowRightLeft, Database, RefreshCw } from 'lucide-react'
 
-// ============================================================================
-// FIX LEAFLET: Corrección de rutas para los íconos de los marcadores del mapa
-// en entornos empaquetados por Vite/Webpack.
-// ============================================================================
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
-
-// ============================================================================
-// COMPONENTES DE UTILIDAD Y UI BASE
-// ============================================================================
 
 const GlobalStyles = () => (
   <style>{`
@@ -64,6 +56,10 @@ const GlobalStyles = () => (
     #root { width: 100%; max-width: none; padding: 0; margin: 0; }
     @keyframes slideIn { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     
+    /* 🔥 NUEVO: Animación para el botón de actualizar */
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    .spin-anim { animation: spin 1s linear infinite; }
+
     input, select, textarea { font-size: 16px !important; outline: none; }
     input:focus, select:focus, textarea:focus { border-color: var(--primary) !important; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
     
@@ -72,7 +68,6 @@ const GlobalStyles = () => (
   `}</style>
 )
 
-// 🔥 TERRITORIO DE CALIMA EL DARIÉN (Ordenado alfabéticamente para mejor UX)
 const BARRIOS_URBANOS = [
   'Altos del Darién', 'Bellavista', 'Canadá', 'Cincuentenario', 'Ciudadela Germán Mejía', 
   'Colinas del Eden', 'Dos Quebradas', 'El Bosque', 'Guayacanes I', 'Guayacanes II', 
@@ -144,30 +139,25 @@ function SeleccionarUbicacion({ formData, setFormData }) {
   return formData.latitud ? <Marker position={[formData.latitud, formData.longitud]} /> : null
 }
 
-// ============================================================================
-// APLICACIÓN PRINCIPAL
-// ============================================================================
-
 function App() {
-  /* --- 1. ESTADOS DE SESIÓN Y UI --- */
   const [usuario, setUsuario] = useState(() => JSON.parse(localStorage.getItem('usuarioElectoral')) || null)
   const [loginData, setLoginData] = useState({ cedula: '', contrasena: '' })
   const [modoOscuro, setModoOscuro] = useState(() => localStorage.getItem('temaElectoral') === 'dark')
+  
+  // 🔥 NUEVO: Estado para saber si la app está recargando datos
+  const [actualizando, setActualizando] = useState(false);
 
-  /* --- 2. ESTADOS DE BASE DE DATOS Y COLAS --- */
   const [simpatizantes, setSimpatizantes] = useState([])
   const [usuariosDb, setUsuariosDb] = useState([]) 
   const [historialConflictos, setHistorialConflictos] = useState([]) 
   const [colaOffline, setColaOffline] = useState(() => JSON.parse(localStorage.getItem('colaOfflineElectoral')) || [])
   const [isOnline, setIsOnline] = useState(navigator.onLine)
 
-  /* --- 3. ESTADOS DE FORMULARIOS --- */
   const [formData, setFormData] = useState({ nombreCompleto: '', cedula: '', telefono: '', zona: 'URBANA', barrioVereda: '', direccion: '', latitud: null, longitud: null, apoyaAlcaldia: false, apoyaConcejo: false, mesa: '', observaciones: '' })
   const [nuevoUsuarioData, setNuevoUsuarioData] = useState({ nombre: '', cedula: '', telefono: '', rol: 'CONCEJAL', contrasena: '', concejalId: '' })
   const [datosEdicion, setDatosEdicion] = useState({ id: null, mesa: '', observaciones: '' })
   const [liderDestino, setLiderDestino] = useState('')
 
-  /* --- 4. ESTADOS DE CONTROL DE MODALES Y FILTROS --- */
   const [modalAbierto, setModalAbierto] = useState(false)
   const [modalUsuarioAbierto, setModalUsuarioAbierto] = useState(false)
   const [modalEditarAbierto, setModalEditarAbierto] = useState(false)
@@ -185,10 +175,6 @@ function App() {
   const [filtroLugarMapa, setFiltroLugarMapa] = useState('TODOS')
 
   const centroCalima = [3.9274, -76.4851]
-
-  /* ========================================================================
-     CICLO DE VIDA Y EFECTOS
-     ======================================================================== */
 
   useEffect(() => {
     if (modoOscuro) {
@@ -209,6 +195,7 @@ function App() {
 
   const cargarDatosIniciales = useCallback(async () => {
     if (!navigator.onLine || !usuario) return; 
+    setActualizando(true);
     try {
       const resSimp = await axios.get('https://api-electoral-calima.onrender.com/api/simpatizantes');
       setSimpatizantes(resSimp.data);
@@ -218,7 +205,11 @@ function App() {
         const resAlertas = await axios.get('https://api-electoral-calima.onrender.com/api/alertas');
         setHistorialConflictos(resAlertas.data);
       }
-    } catch (error) { console.error("Error al cargar datos:", error); }
+    } catch (error) { 
+      console.error("Error al cargar datos:", error); 
+    } finally {
+      setActualizando(false);
+    }
   }, [usuario]);
 
   const agregarConflicto = useCallback(async (cedula, nombre, motivo) => {
@@ -265,13 +256,9 @@ function App() {
 
   useEffect(() => {
     const timerDatos = setTimeout(() => { cargarDatosIniciales(); }, 0);
-    const intervaloSincronizacion = setInterval(cargarDatosIniciales, 10000);
+    const intervaloSincronizacion = setInterval(cargarDatosIniciales, 180000); 
     return () => { clearTimeout(timerDatos); clearInterval(intervaloSincronizacion); };
   }, [cargarDatosIniciales])
-
-  /* ========================================================================
-     CONTROLADORES DE API (CRUD)
-     ======================================================================== */
 
   const manejarLogin = async (e) => {
     e.preventDefault();
@@ -397,10 +384,6 @@ function App() {
     setUsuario(null); setSimpatizantes([]); setUsuariosDb([]); setTerminoBusqueda(''); localStorage.removeItem('usuarioElectoral'); 
   }
 
-  /**
-   * @function exportarAExcel
-   * @description Extrae la vista actual de datos a formato CSV respetando UTF-8 (Tildes).
-   */
   const exportarAExcel = () => {
     const cabeceras = ['Nombre Completo', 'Cédula', 'Teléfono', 'Zona', 'Barrio/Vereda', 'Dirección', 'Apoya Alcaldía', 'Apoya Concejo', 'Líder Registrador', 'Mesa Votación', 'Observaciones'];
     const filas = simpatizantesVisibles.map(s => [
@@ -414,10 +397,6 @@ function App() {
     link.click();
     document.body.removeChild(link);
   };
-
-  /* ========================================================================
-     LÓGICA DE FILTRADO Y MÉTRICAS (React Compiler Auto-Memoized)
-     ======================================================================== */
 
   const simpatizantesPermitidos = simpatizantes.filter(s => {
     if (usuario?.rol === 'ADMIN') return true; 
@@ -452,7 +431,6 @@ function App() {
     return true;
   });
 
-  // Preparación de datos para Recharts
   const agruparPorLugar = (zona) => {
     const filtrados = simpatizantesMetricas.filter(s => s.zona === zona);
     const conteo = {};
@@ -472,10 +450,6 @@ function App() {
     { name: 'Solo Concejo', value: votosConcejo, color: 'var(--secondary)' },
     { name: 'Sin Definir', value: sinApoyo > 0 ? sinApoyo : 0, color: 'var(--border-color)' }
   ].filter(d => d.value > 0);
-
-  /* ========================================================================
-     RENDERIZADO VISUAL
-     ======================================================================== */
 
   if (!usuario) {
     return (
@@ -512,8 +486,16 @@ function App() {
     <div style={{ padding: '20px', width: '100vw', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <GlobalStyles />
       
-      {/* 📡 STATUS BAR */}
+      {/* 📡 STATUS BAR CON BOTÓN DE SINCRONIZACIÓN MANUAL */}
       <div style={{ position: 'fixed', top: '10px', right: '20px', display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-card)', padding: '6px 12px', borderRadius: '20px', boxShadow: 'var(--shadow)', zIndex: 9999, border: '1px solid var(--border-color)' }}>
+        
+        {/* 🔥 Botón de recarga manual */}
+        <button onClick={cargarDatosIniciales} disabled={actualizando || !isOnline} style={{ background: 'transparent', border: 'none', cursor: (actualizando || !isOnline) ? 'not-allowed' : 'pointer', padding: 0, display: 'flex', alignItems: 'center', color: 'var(--primary)' }} title="Sincronizar datos">
+          <RefreshCw size={16} className={actualizando ? "spin-anim" : ""} />
+        </button>
+
+        <div style={{ width: '1px', height: '15px', background: 'var(--border-color)', margin: '0 5px' }}></div>
+
         <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: isOnline ? 'var(--secondary)' : 'var(--danger)', boxShadow: isOnline ? '0 0 8px var(--secondary)' : '0 0 8px var(--danger)' }}></div>
         <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-muted)', marginRight: '10px' }}>{isOnline ? 'En línea' : 'Offline'}</span>
         
@@ -771,7 +753,7 @@ function App() {
             </div>
           </div>
           <div style={{ position: 'relative', height: '450px', width: '100%', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-color)', zIndex: 0 }}>
-            <MapContainer center={centroCalima} zoom={14} style={{ height: '100%', width: '100%', zIndex: 1 }}>
+            <MapContainer preferCanvas={true} center={centroCalima} zoom={14} style={{ height: '100%', width: '100%', zIndex: 1 }}>
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
               <BotonCentrarUbicacion />
               {simpatizantesMapa.map(s => (
@@ -983,20 +965,20 @@ function App() {
             <h3 style={{ margin: '0 0 20px 0', fontSize: '22px', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '10px' }}><UserPlus size={24} color="var(--accent)" /> Registro</h3>
             
             <form onSubmit={guardarSimpatizante} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              <input placeholder="Nombre Completo" value={formData.nombreCompleto} onChange={e => setFormData({...formData, nombreCompleto: e.target.value})} required style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
-              <input placeholder="Cédula" value={formData.cedula} onChange={e => setFormData({...formData, cedula: e.target.value})} required style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
-              <input placeholder="Teléfono" value={formData.telefono} onChange={e => setFormData({...formData, telefono: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
+              <input placeholder="Nombre Completo" value={formData.nombreCompleto} onChange={e => setFormData({...formData, nombreCompleto: e.target.value})} required style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
+              <input placeholder="Cédula" value={formData.cedula} onChange={e => setFormData({...formData, cedula: e.target.value})} required style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
+              <input placeholder="Teléfono" value={formData.telefono} onChange={e => setFormData({...formData, telefono: e.target.value})} style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
               
               {/* CAMPOS OPCIONALES NUEVOS */}
               <input placeholder="Mesa de Votación (Opcional)" value={formData.mesa} onChange={e => setFormData({...formData, mesa: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
               <textarea placeholder="Observaciones (transporte, etc.) (Opcional)" rows="2" value={formData.observaciones} onChange={e => setFormData({...formData, observaciones: e.target.value})} style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)', resize: 'none' }} />
 
               <div style={{ display: 'flex', gap: '10px' }}>
-                <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px', borderRadius: '8px', cursor: 'pointer', background: formData.zona === 'URBANA' ? 'var(--primary)' : 'var(--bg-input)', color: formData.zona === 'URBANA' ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', fontWeight: 'bold' }}>
+                <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px', borderRadius: '8px', cursor: 'pointer', background: formData.zona === 'URBANA' ? 'var(--primary)' : 'var(--bg-input)', color: formData.zona === 'URBANA' ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', fontWeight: 'bold' }}>
                   <input type="radio" name="zona" value="URBANA" checked={formData.zona === 'URBANA'} onChange={() => setFormData({...formData, zona: 'URBANA', barrioVereda: ''})} style={{ display: 'none' }} />
                   Urbana
                 </label>
-                <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px', borderRadius: '8px', cursor: 'pointer', background: formData.zona === 'RURAL' ? 'var(--secondary)' : 'var(--bg-input)', color: formData.zona === 'RURAL' ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', fontWeight: 'bold' }}>
+                <label style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px', borderRadius: '8px', cursor: 'pointer', background: formData.zona === 'RURAL' ? 'var(--secondary)' : 'var(--bg-input)', color: formData.zona === 'RURAL' ? 'white' : 'var(--text-muted)', border: '1px solid var(--border-color)', fontWeight: 'bold' }}>
                   <input type="radio" name="zona" value="RURAL" checked={formData.zona === 'RURAL'} onChange={() => setFormData({...formData, zona: 'RURAL', barrioVereda: ''})} style={{ display: 'none' }} />
                   Rural
                 </label>
@@ -1010,7 +992,7 @@ function App() {
               <input placeholder="Dirección o referencia" value={formData.direccion} onChange={e => setFormData({...formData, direccion: e.target.value})} required style={{ padding: '14px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-input)', color: 'var(--text-main)' }} />
 
               <div style={{ position: 'relative', height: '180px', width: '100%', borderRadius: '10px', overflow: 'hidden', border: formData.latitud ? '2px solid var(--secondary)' : '2px solid var(--border-color)', zIndex: 0 }}>
-                <MapContainer center={centroCalima} zoom={15} style={{ height: '100%', width: '100%', zIndex: 1 }}>
+                <MapContainer preferCanvas={true} center={centroCalima} zoom={15} style={{ height: '100%', width: '100%', zIndex: 1 }}>
                   <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                   <BotonCentrarUbicacion setFormData={setFormData} />
                   <SeleccionarUbicacion formData={formData} setFormData={setFormData} />
